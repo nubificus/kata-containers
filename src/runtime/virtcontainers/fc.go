@@ -41,6 +41,7 @@ import (
 	"go.opentelemetry.io/otel"
 	otelLabel "go.opentelemetry.io/otel/label"
 	otelTrace "go.opentelemetry.io/otel/trace"
+	"github.com/nubificus/vaccel-go-runtime/vaccel"
 )
 
 type vmmState uint8
@@ -144,6 +145,7 @@ type firecracker struct {
 
 	firecrackerd *exec.Cmd           //Tracks the firecracker process itself
 	connection   *client.Firecracker //Tracks the current active connection
+	accelerator  *vaccel.Vaccel
 
 	ctx            context.Context
 	config         HypervisorConfig
@@ -332,6 +334,37 @@ func (fc *firecracker) waitVMMRunning(ctx context.Context, timeout int) error {
 
 		time.Sleep(time.Duration(10) * time.Millisecond)
 	}
+}
+
+func (fc *firecracker) hasAccel(ctx context.Context) *vaccel.Vaccel {
+	span, _ := fc.trace(ctx, "hasAccel")
+	defer span.End()
+
+        accelerators := fc.config.MachineAccelerators
+        if accelerators != "" {
+		for _, accelerator := range strings.Split(accelerators, ",") {
+	                switch strings.TrimSpace(accelerator){
+			case "vaccel-vsock":
+				vaccelpath := fc.config.MachineAcceleratorsPath
+				vaccelport := fc.config.VaccelVsockPort
+				vaccel := &vaccel.Vaccel{
+					GuestBackend: "vsock",
+					VaccelPath: vaccelpath,
+					SocketPort: vaccelport,
+				}
+				return vaccel
+			case "vaccel-virtio":
+				// TODO
+				fc.Logger().Warnf("Acceleration Framework not supported %s", accelerator)
+				break
+			default:
+				fc.Logger().Warnf("Acceleration Framework not defined %s", accelerator)
+				break
+			}
+		}
+
+        }
+	return nil
 }
 
 func (fc *firecracker) fcInit(ctx context.Context, timeout int) error {
@@ -800,7 +833,14 @@ func (fc *firecracker) startSandbox(ctx context.Context, timeout int) error {
 	if err != nil {
 		return err
 	}
-
+        accel := fc.hasAccel(ctx)
+        if accel != nil {
+                accel.SocketPath = filepath.Join(fc.jailerRoot, defaultHybridVSocketName)
+		if err := accel.VaccelInit(); err != nil {
+			return err
+		}
+	}
+	fc.accelerator = accel
 	// make sure 'others' don't have access to this socket
 	err = os.Chmod(filepath.Join(fc.jailerRoot, defaultHybridVSocketName), 0640)
 	if err != nil {
@@ -879,6 +919,10 @@ func (fc *firecracker) cleanupJail(ctx context.Context) {
 func (fc *firecracker) stopSandbox(ctx context.Context) (err error) {
 	span, _ := fc.trace(ctx, "stopSandbox")
 	defer span.End()
+
+	if err := fc.accelerator.VaccelEnd(); err != nil {
+		return err
+        }
 
 	return fc.fcEnd(ctx)
 }

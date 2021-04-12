@@ -40,6 +40,16 @@ valid_hypervisor_paths = @FCVALIDHYPERVISORPATHS@
 # Your distribution recommends: @FCVALIDJAILERPATHS@
 valid_jailer_paths = @FCVALIDJAILERPATHS@
 
+# Machine accelerators
+# comma-separated list of machine accelerators to pass to the runtime / hypervisor.
+# For example, `machine_accelerators = "vaccel-vsock, vaccel-virtio"`
+#machine_accelerators="@MACHINEACCELERATORS@"
+
+# Machine accelerators path.
+#machine_accelerators_path="@MACHINEACCELERATORSPATH@"
+
+# If machine_accelerators=vaccel-vsock specify the vAccel Agent vsock port
+#vaccel_vsock_port = 2048
 
 # Optional space-separated list of options to pass to the guest kernel.
 # For example, use `kernel_params = "vsyscall=emulate"` if you are having

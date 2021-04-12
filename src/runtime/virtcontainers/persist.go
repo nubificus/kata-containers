@@ -210,6 +210,8 @@ func (s *Sandbox) dumpConfig(ss *persistapi.SandboxState) {
 		InitrdPath:              sconfig.HypervisorConfig.InitrdPath,
 		FirmwarePath:            sconfig.HypervisorConfig.FirmwarePath,
 		MachineAccelerators:     sconfig.HypervisorConfig.MachineAccelerators,
+		MachineAcceleratorsPath: sconfig.HypervisorConfig.MachineAcceleratorsPath,
+		VaccelVsockPort:         sconfig.HypervisorConfig.VaccelVsockPort,
 		CPUFeatures:             sconfig.HypervisorConfig.CPUFeatures,
 		HypervisorPath:          sconfig.HypervisorConfig.HypervisorPath,
 		HypervisorPathList:      sconfig.HypervisorConfig.HypervisorPathList,
