@@ -269,6 +269,10 @@ type HypervisorConfig struct {
 	// MachineAccelerators are machine specific accelerators
 	MachineAccelerators string
 
+	MachineAcceleratorsPath string
+
+	VaccelVsockPort uint32
+
 	// CPUFeatures are cpu specific features
 	CPUFeatures string
 

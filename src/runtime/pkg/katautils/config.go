@@ -79,6 +79,8 @@ type hypervisor struct {
 	Image                   string   `toml:"image"`
 	Firmware                string   `toml:"firmware"`
 	MachineAccelerators     string   `toml:"machine_accelerators"`
+	MachineAcceleratorsPath string   `toml:"machine_accelerators_path"`
+	VaccelVsockPort         uint32   `toml:"vaccel_vsock_port"`
 	CPUFeatures             string   `toml:"cpu_features"`
 	KernelParams            string   `toml:"kernel_params"`
 	MachineType             string   `toml:"machine_type"`
@@ -533,6 +535,7 @@ func newFirecrackerHypervisorConfig(h hypervisor) (vc.HypervisorConfig, error) {
 		return vc.HypervisorConfig{}, err
 	}
 
+	machineAccelerators := h.machineAccelerators()
 	kernelParams := h.kernelParams()
 
 	blockDriver, err := h.blockDeviceDriver()
@@ -552,6 +555,9 @@ func newFirecrackerHypervisorConfig(h hypervisor) (vc.HypervisorConfig, error) {
 		InitrdPath:            initrd,
 		ImagePath:             image,
 		FirmwarePath:          firmware,
+                MachineAccelerators:   machineAccelerators,
+                MachineAcceleratorsPath:   h.MachineAcceleratorsPath,
+		VaccelVsockPort:       h.VaccelVsockPort,
 		KernelParams:          vc.DeserializeParams(strings.Fields(kernelParams)),
 		NumVCPUs:              h.defaultVCPUs(),
 		DefaultMaxVCPUs:       h.defaultMaxVCPUs(),
