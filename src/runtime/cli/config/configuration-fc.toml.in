@@ -49,7 +49,8 @@ valid_jailer_paths = @FCVALIDJAILERPATHS@
 #machine_accelerators_path="@MACHINEACCELERATORSPATH@"
 
 # If machine_accelerators=vaccel-vsock specify the vAccel Agent vsock port
-#vaccel_vsock_port = 2048
+# default value is 2048
+#vaccel_vsock_port =
 
 # Optional space-separated list of options to pass to the guest kernel.
 # For example, use `kernel_params = "vsyscall=emulate"` if you are having

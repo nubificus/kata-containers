@@ -1305,6 +1305,23 @@ func (k *kataAgent) createContainer(ctx context.Context, sandbox *Sandbox, c *Co
 	if ociSpec == nil {
 		return nil, errorMissingOCISpec
 	}
+	hconfig := sandbox.hypervisor.hypervisorConfig()
+	accelerators := hconfig.MachineAccelerators
+	if accelerators != "" {
+		for _, accelerator := range strings.Split(accelerators, ",") {
+			switch strings.TrimSpace(accelerator) {
+			case "vaccel-vsock":
+				vaccel_port := hconfig.VaccelVsockPort
+				vaccel_vport := "VACCEL_VSOCK=vsock://2:" + strconv.FormatUint(uint64(vaccel_port), 10)
+				ociSpec.Process.Env = append(ociSpec.Process.Env, vaccel_vport)
+				break
+			case "vaccel-virtio":
+				// append /dev/accel to OCI Spec req and hopefully kata-agent will do the rest and find
+				// the major/minor numbers inside the VM
+			}
+		}
+
+	}
 
 	// Handle container mounts
 	newMounts, ignoredMounts, err := c.mountSharedDirMounts(ctx, getSharePath(sandbox.id), getMountPath(sandbox.id), kataGuestSharedDir())
