@@ -266,6 +266,15 @@ func (h hypervisor) machineAccelerators() string {
 	return machineAccelerators
 }
 
+func (h hypervisor) vaccelVsockPort() uint32 {
+	port := h.VaccelVsockPort
+	if port == 0 {
+		port = defaultVaccelPort
+	}
+
+	return port
+}
+
 func (h hypervisor) cpuFeatures() string {
 	var cpuFeatures string
 	for _, feature := range strings.Split(h.CPUFeatures, ",") {
@@ -556,7 +565,7 @@ func newFirecrackerHypervisorConfig(h hypervisor) (vc.HypervisorConfig, error) {
 		FirmwarePath:          firmware,
                 MachineAccelerators:   machineAccelerators,
                 MachineAcceleratorsPath:   h.MachineAcceleratorsPath,
-		VaccelVsockPort:       h.VaccelVsockPort,
+		VaccelVsockPort:       h.vaccelVsockPort(),
 		KernelParams:          vc.DeserializeParams(strings.Fields(kernelParams)),
 		NumVCPUs:              h.defaultVCPUs(),
 		DefaultMaxVCPUs:       h.defaultMaxVCPUs(),
