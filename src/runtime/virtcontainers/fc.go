@@ -919,11 +919,11 @@ func (fc *firecracker) cleanupJail(ctx context.Context) {
 func (fc *firecracker) stopSandbox(ctx context.Context) (err error) {
 	span, _ := fc.trace(ctx, "stopSandbox")
 	defer span.End()
-
-	if err := fc.accelerator.VaccelEnd(); err != nil {
-		return err
-        }
-
+	if fc.accelerator != nil {
+		if err := fc.accelerator.VaccelEnd(); err != nil {
+			return err
+		}
+	}
 	return fc.fcEnd(ctx)
 }
 
