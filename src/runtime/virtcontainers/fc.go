@@ -902,10 +902,11 @@ func (fc *firecracker) stopSandbox(ctx context.Context, waitOnly bool) (err erro
 	span, _ := fc.trace(ctx, "stopSandbox")
 	defer span.End()
 
-	if err := fc.accelerator.VaccelEnd(); err != nil {
-		return err
-        }
-
+	if fc.accelerator != nil {
+		if err := fc.accelerator.VaccelEnd(); err != nil {
+			return err
+		}
+	}
 	return fc.fcEnd(ctx, waitOnly)
 }
 
