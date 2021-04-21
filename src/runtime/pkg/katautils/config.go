@@ -81,6 +81,7 @@ type hypervisor struct {
 	MachineAccelerators     string   `toml:"machine_accelerators"`
 	MachineAcceleratorsPath string   `toml:"machine_accelerators_path"`
 	VaccelVsockPort         uint32   `toml:"vaccel_vsock_port"`
+	VaccelHostBackend       string   `toml:"vaccel_host_backend"`
 	CPUFeatures             string   `toml:"cpu_features"`
 	KernelParams            string   `toml:"kernel_params"`
 	MachineType             string   `toml:"machine_type"`
@@ -274,6 +275,16 @@ func (h hypervisor) vaccelVsockPort() uint32 {
 	}
 
 	return port
+}
+
+func (h hypervisor) vaccelHostBackend() string {
+	hb := h.VaccelHostBackend
+
+	if hb == "" {
+		hb = defaultVaccelHostBackend
+	}
+
+	return hb
 }
 
 func (h hypervisor) cpuFeatures() string {
@@ -567,6 +578,7 @@ func newFirecrackerHypervisorConfig(h hypervisor) (vc.HypervisorConfig, error) {
                 MachineAccelerators:   machineAccelerators,
                 MachineAcceleratorsPath:   h.MachineAcceleratorsPath,
 		VaccelVsockPort:       h.vaccelVsockPort(),
+		VaccelHostBackend:     h.vaccelHostBackend(),
 		KernelParams:          vc.DeserializeParams(strings.Fields(kernelParams)),
 		NumVCPUs:              h.defaultVCPUs(),
 		DefaultMaxVCPUs:       h.defaultMaxVCPUs(),
