@@ -59,6 +59,8 @@ type HypervisorConfig struct {
 
 	VaccelVsockPort uint32
 
+	VaccelHostBackend string
+
 	// CPUFeatures are cpu specific features
 	CPUFeatures string
 

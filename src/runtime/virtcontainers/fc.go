@@ -347,8 +347,10 @@ func (fc *firecracker) hasAccel(ctx context.Context) *vaccel.Vaccel {
 			case "vaccel-vsock":
 				vaccelpath := fc.config.MachineAcceleratorsPath
 				vaccelport := fc.config.VaccelVsockPort
+				vaccelhost := fc.config.VaccelHostBackend
 				vaccel := &vaccel.Vaccel{
 					GuestBackend: "vsock",
+					HostBackend: "libvaccel-" + vaccelhost + ".so",
 					VaccelPath: vaccelpath,
 					SocketPort: vaccelport,
 				}
