@@ -435,6 +435,36 @@ func (a *Client) PutGuestBootSource(params *PutGuestBootSourceParams) (*PutGuest
 }
 
 /*
+PutGuestCrypto creates updates a crypto device pre boot only
+
+The first call creates the device with the configuration specified in body. Subsequent calls will update the device configuration. May fail if update is not possible.
+*/
+func (a *Client) PutGuestCrypto(params *PutGuestCryptoParams) (*PutGuestCryptoNoContent, error) {
+	// TODO: Validate the params before sending
+	if params == nil {
+		params = NewPutGuestCryptoParams()
+	}
+
+	result, err := a.transport.Submit(&runtime.ClientOperation{
+		ID:                 "putGuestCrypto",
+		Method:             "PUT",
+		PathPattern:        "/crypto",
+		ProducesMediaTypes: []string{"application/json"},
+		ConsumesMediaTypes: []string{"application/json"},
+		Schemes:            []string{"http"},
+		Params:             params,
+		Reader:             &PutGuestCryptoReader{formats: a.formats},
+		Context:            params.Context,
+		Client:             params.HTTPClient,
+	})
+	if err != nil {
+		return nil, err
+	}
+	return result.(*PutGuestCryptoNoContent), nil
+
+}
+
+/*
 PutGuestDriveByID creates or updates a drive pre boot only
 
 Creates new drive with ID specified by drive_id path parameter. If a drive with the specified ID already exists, updates its state based on new input. Will fail if update is not possible.
