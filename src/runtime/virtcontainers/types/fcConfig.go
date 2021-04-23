@@ -18,6 +18,8 @@ type FcConfig struct {
 
 	Vsock *models.Vsock `json:"vsock,omitempty"`
 
+	Crypto *models.Crypto `json:"crypto,omitempty"`
+
 	NetworkInterfaces []*models.NetworkInterface `json:"network-interfaces,omitempty"`
 
 	Logger *models.Logger `json:"logger,omitempty"`

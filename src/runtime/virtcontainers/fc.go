@@ -357,6 +357,7 @@ func (fc *firecracker) hasAccel(ctx context.Context) *vaccel.Vaccel {
 				return vaccel
 			case "vaccel-virtio":
 				// TODO
+				fc.fcAddCryptoDev(ctx)
 				fc.Logger().Warnf("Acceleration Framework not supported %s", accelerator)
 				break
 			default:
@@ -942,6 +943,20 @@ func (fc *firecracker) fcAddVsock(ctx context.Context, hvs types.HybridVSock) {
 	}
 
 	fc.fcConfig.Vsock = vsock
+}
+
+func (fc *firecracker) fcAddCryptoDev(ctx context.Context) {
+        span, _ := fc.trace(ctx, "fcAddCryptoDev")
+        defer span.End()
+
+        cryptoID := "vaccel"
+        hostCryptoDev := "vaccel"
+        crypto := &models.Crypto{
+                CryptoDevID: &cryptoID,
+                HostCryptoDev:  &hostCryptoDev,
+        }
+
+        fc.fcConfig.Crypto = crypto
 }
 
 func (fc *firecracker) fcAddNetDevice(ctx context.Context, endpoint Endpoint) {
