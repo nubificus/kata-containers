@@ -1155,6 +1155,41 @@ func (k *kataAgent) appendVhostUserBlkDevice(dev ContainerDevice, c *Container) 
 	return kataDevice
 }
 
+func (k *kataAgent) VaccelVirtioDevice(grpcSpec *grpc.Spec) *grpc.Device {
+
+	// Update the OCI Spec to include the vAccel Device
+	accelDev := grpc.LinuxDevice{
+                Path: "/dev/accel",
+                Type: "c",
+                Major: 2,
+                Minor: 42,
+                FileMode: 0666,
+                UID: 0,
+                GID: 0,
+        }
+        grpcSpec.Linux.Devices = append(grpcSpec.Linux.Devices, accelDev)
+
+        accelResourcesDev := grpc.LinuxDeviceCgroup{
+                Allow:  true,
+                Major:  2,
+                Minor:  42,
+                Type:   "c",
+                Access: "rwm",
+        }
+
+        grpcSpec.Linux.Resources.Devices = append(grpcSpec.Linux.Resources.Devices, accelResourcesDev)
+
+	// create a kata device type
+	kataDevice := &grpc.Device{
+		ContainerPath: "/dev/accel",
+		Type:          kataMmioBlkDevType,
+		Id:            "/dev/accel",
+		VmPath:        "/dev/accel",
+	}
+
+	return kataDevice
+}
+
 func (k *kataAgent) appendDevices(deviceList []*grpc.Device, c *Container) []*grpc.Device {
 	var kataDevice *grpc.Device
 
@@ -1305,23 +1340,6 @@ func (k *kataAgent) createContainer(ctx context.Context, sandbox *Sandbox, c *Co
 	if ociSpec == nil {
 		return nil, errorMissingOCISpec
 	}
-	hconfig := sandbox.hypervisor.hypervisorConfig()
-	accelerators := hconfig.MachineAccelerators
-	if accelerators != "" {
-		for _, accelerator := range strings.Split(accelerators, ",") {
-			switch strings.TrimSpace(accelerator) {
-			case "vaccel-vsock":
-				vaccel_port := hconfig.VaccelVsockPort
-				vaccel_vport := "VACCEL_VSOCK=vsock://2:" + strconv.FormatUint(uint64(vaccel_port), 10)
-				ociSpec.Process.Env = append(ociSpec.Process.Env, vaccel_vport)
-				break
-			case "vaccel-virtio":
-				// append /dev/accel to OCI Spec req and hopefully kata-agent will do the rest and find
-				// the major/minor numbers inside the VM
-			}
-		}
-
-	}
 
 	// Handle container mounts
 	newMounts, ignoredMounts, err := c.mountSharedDirMounts(ctx, getSharePath(sandbox.id), getMountPath(sandbox.id), kataGuestSharedDir())
@@ -1389,6 +1407,25 @@ func (k *kataAgent) createContainer(ctx context.Context, sandbox *Sandbox, c *Co
 	// We need to constraint the spec to make sure we're not passing
 	// irrelevant information to the agent.
 	k.constraintGRPCSpec(grpcSpec, passSeccomp)
+
+	hconfig := sandbox.hypervisor.hypervisorConfig()
+	accelerators := hconfig.MachineAccelerators
+	if accelerators != "" {
+		for _, accelerator := range strings.Split(accelerators, ",") {
+			switch strings.TrimSpace(accelerator) {
+			case "vaccel-vsock":
+				vaccel_port := hconfig.VaccelVsockPort
+				vaccel_vport := "VACCEL_VSOCK=vsock://2:" + strconv.FormatUint(uint64(vaccel_port), 10)
+				grpcSpec.Process.Env = append(grpcSpec.Process.Env, vaccel_vport)
+				break
+			case "vaccel-virtio":
+				// append /dev/accel to OCI Spec req and hopefully kata-agent will do the rest and find
+				// the major/minor numbers inside the VM
+				ctrDevices = append(ctrDevices, k.VaccelVirtioDevice(grpcSpec))
+			}
+		}
+
+	}
 
 	req := &grpc.CreateContainerRequest{
 		ContainerId:  c.id,

@@ -65,7 +65,7 @@ const (
 	// firecracker guest VM.
 	// We attach a pool of placeholder drives before the guest has started, and then
 	// patch the replace placeholder drives with drives with actual contents.
-	fcDiskPoolSize           = 8
+	fcDiskPoolSize           = 5
 	defaultHybridVSocketName = "kata.hvsock"
 
 	// This is the first usable vsock context ID. All the vsocks can use the same
@@ -345,21 +345,24 @@ func (fc *firecracker) hasAccel(ctx context.Context) *vaccel.Vaccel {
 		for _, accelerator := range strings.Split(accelerators, ",") {
 	                switch strings.TrimSpace(accelerator){
 			case "vaccel-vsock":
-				vaccelpath := fc.config.MachineAcceleratorsPath
-				vaccelport := fc.config.VaccelVsockPort
-				vaccelhost := fc.config.VaccelHostBackend
 				vaccel := &vaccel.Vaccel{
 					GuestBackend: "vsock",
-					HostBackend: "libvaccel-" + vaccelhost + ".so",
-					VaccelPath: vaccelpath,
-					SocketPort: vaccelport,
+					HostBackend: "libvaccel-" + fc.config.VaccelHostBackend + ".so",
+					VaccelPath: fc.config.MachineAcceleratorsPath,
+					SocketPort: fc.config.VaccelVsockPort,
 				}
+				fc.Logger().Info("hasAccel: vsock")
 				return vaccel
 			case "vaccel-virtio":
 				// TODO
-				fc.fcAddCryptoDev(ctx)
-				fc.Logger().Warnf("Acceleration Framework not supported %s", accelerator)
-				break
+				vaccel := &vaccel.Vaccel{
+					GuestBackend: "virtio",
+					HostBackend: "libvaccel-" + fc.config.VaccelHostBackend + ".so",
+					VaccelPath: fc.config.MachineAcceleratorsPath,
+				}
+				//fc.Logger().Warnf("Acceleration Framework not supported %s", accelerator)
+				fc.Logger().Info("hasAccel: virtio")
+				return vaccel
 			default:
 				fc.Logger().Warnf("Acceleration Framework not defined %s", accelerator)
 				break
@@ -375,6 +378,7 @@ func (fc *firecracker) fcInit(ctx context.Context, timeout int) error {
 	defer span.End()
 
 	var err error
+	fc.Logger().Info("In fcInit")
 	//FC version set and check
 	if fc.info.Version, err = fc.getVersionNumber(); err != nil {
 		return err
@@ -417,7 +421,21 @@ func (fc *firecracker) fcInit(ctx context.Context, timeout int) error {
 		args = append(args,
 			"--api-sock", fc.socketPath,
 			"--config-file", fc.fcConfigPath)
+		fc.Logger().Info("appended args")
+
+		// firecracker with virtio vaccel works only with seccomp 0 lvl
+		if fc.accelerator != nil && fc.accelerator.GuestBackend == "virtio" {
+			args = append(args, "--seccomp-level", "0")
+		}
 		cmd = exec.Command(fc.config.HypervisorPath, args...)
+
+		/*if fc.accelerator != nil && fc.accelerator.GuestBackend == "virtio" {
+			fc.Logger().Info("appended env for virtio")
+			ld_path := "LD_LIBRARY_PATH=" + filepath.Join(fc.accelerator.VaccelPath, "lib")
+		        vaccel_backends := "VACCEL_BACKENDS=" + filepath.Join(fc.accelerator.VaccelPath, "lib", fc.accelerator.HostBackend)
+			cmd.Env = os.Environ()
+		        cmd.Env = append(cmd.Env, vaccel_backends, ld_path)
+		}*/
 	}
 
 	if fc.config.Debug {
@@ -433,6 +451,7 @@ func (fc *firecracker) fcInit(ctx context.Context, timeout int) error {
 		fc.Logger().WithField("Error starting firecracker", err).Debug()
 		return err
 	}
+	fc.Logger().Info("started firecracker")
 
 	fc.info.PID = cmd.Process.Pid
 	fc.firecrackerd = cmd
@@ -749,6 +768,9 @@ func (fc *firecracker) fcInitConfiguration(ctx context.Context) error {
 		}
 	}
 
+	if fc.accelerator != nil && fc.accelerator.GuestBackend == "virtio" {
+		fc.fcAddCryptoDev(ctx)
+	}
 	if err := fc.fcSetVMRootfs(ctx, image); err != nil {
 		return err
 	}
@@ -785,6 +807,7 @@ func (fc *firecracker) startSandbox(ctx context.Context, timeout int) error {
 	span, _ := fc.trace(ctx, "startSandbox")
 	defer span.End()
 
+        fc.accelerator = fc.hasAccel(ctx)
 	if err := fc.fcInitConfiguration(ctx); err != nil {
 		return err
 	}
@@ -814,18 +837,17 @@ func (fc *firecracker) startSandbox(ctx context.Context, timeout int) error {
 	}
 	defer label.SetProcessLabel("")
 
+	fc.Logger().Info("calling FcInit")
 	err = fc.fcInit(ctx, fcTimeout)
 	if err != nil {
 		return err
 	}
-        accel := fc.hasAccel(ctx)
-        if accel != nil {
-                accel.SocketPath = filepath.Join(fc.jailerRoot, defaultHybridVSocketName)
-		if err := accel.VaccelInit(); err != nil {
+        if fc.accelerator != nil && fc.accelerator.GuestBackend == "vsock" {
+                fc.accelerator.SocketPath = filepath.Join(fc.jailerRoot, defaultHybridVSocketName)
+		if err := fc.accelerator.VaccelInit(); err != nil {
 			return err
 		}
 	}
-	fc.accelerator = accel
 	// make sure 'others' don't have access to this socket
 	err = os.Chmod(filepath.Join(fc.jailerRoot, defaultHybridVSocketName), 0640)
 	if err != nil {
@@ -949,8 +971,8 @@ func (fc *firecracker) fcAddCryptoDev(ctx context.Context) {
         span, _ := fc.trace(ctx, "fcAddCryptoDev")
         defer span.End()
 
-        cryptoID := "vaccel"
-        hostCryptoDev := "vaccel"
+        cryptoID := "/dev/accel"
+        hostCryptoDev := "/dev/accel"
         crypto := &models.Crypto{
                 CryptoDevID: &cryptoID,
                 HostCryptoDev:  &hostCryptoDev,
