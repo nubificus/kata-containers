@@ -429,13 +429,17 @@ func (fc *firecracker) fcInit(ctx context.Context, timeout int) error {
 		}
 		cmd = exec.Command(fc.config.HypervisorPath, args...)
 
-		/*if fc.accelerator != nil && fc.accelerator.GuestBackend == "virtio" {
+		if fc.accelerator != nil && fc.accelerator.GuestBackend == "virtio" {
 			fc.Logger().Info("appended env for virtio")
-			ld_path := "LD_LIBRARY_PATH=" + filepath.Join(fc.accelerator.VaccelPath, "lib")
 		        vaccel_backends := "VACCEL_BACKENDS=" + filepath.Join(fc.accelerator.VaccelPath, "lib", fc.accelerator.HostBackend)
 			cmd.Env = os.Environ()
-		        cmd.Env = append(cmd.Env, vaccel_backends, ld_path)
-		}*/
+		        cmd.Env = append(cmd.Env, vaccel_backends)
+			if fc.accelerator.HostBackend == "jetson" {
+				vaccel_imagenet := "VACCEL_IMAGENET_NETWORKS=" + filepath.Join(fc.accelerator.VaccelPath, "share/data/networks")
+				cuda_cache := "CUDA_CACHE_PATH=/tmp/"
+				cmd.Env = append(cmd.Env, vaccel_imagenet, cuda_cache)
+			}
+		}
 	}
 
 	if fc.config.Debug {
