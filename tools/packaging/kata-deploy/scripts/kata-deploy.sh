@@ -18,8 +18,8 @@ kata_path=${KATA_INSTALL_PATH:-$kata_default_path}
 
 shims=(
 	"fc"
-	"qemu"
-	"clh"
+	"fc-vaccel"
+	"fc-vaccel-virtio"
 )
 
 # If we fail for any reason a message will be displayed
@@ -54,9 +54,20 @@ function install_artifacts() {
 	echo "copying kata artifacts onto host"
 	cp -a /opt/kata-artifacts/opt/kata/* ${kata_path}/
 	chmod +x ${kata_path}/bin/*
-	
-	# change kata installation if KATA_INSTALL_PATH is defined
+
 	sed -i -- 's~/opt/kata~'"${kata_path}"'~g' ${kata_path}/share/defaults/kata-containers/configuration*
+
+	echo "Installing vAccel runtime to host"
+        # Hypervisor (Firecracker vAccel Virtio) and vaccelrt-agent binaries are linked
+        # against Vaccel Runtime. Create a link to libvaccel.so in a systems runtime
+        # library path (usr/local/lib)
+        local libvaccel_link="/usr/local/lib/libvaccel.so"
+        if [ -L "${libvaccel_link}" ]; then
+                echo "warning: /usr/local/lib/libvaccel.so already exists"
+        else
+                ln -sf ${kata_path}/lib/libvaccel.so /usr/local/lib/libvaccel.so
+        fi
+        echo "Finished vAccel artifacts installation on host"
 
 }
 
@@ -216,7 +227,10 @@ function configure_containerd() {
 
 function remove_artifacts() {
 	echo "deleting kata artifacts"
-	rm -rf ${kata_path}/
+	rm -rf ${kata_path}
+	echo "deleting libvaccel.so link from /usr/local/lib"
+        rm -f /usr/local/lib/libvaccel.so
+
 }
 
 function cleanup_cri_runtime() {
