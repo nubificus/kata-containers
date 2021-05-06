@@ -13,6 +13,9 @@ crio_drop_in_conf_file="${crio_drop_in_conf_dir}/99-kata-deploy"
 containerd_conf_file="/etc/containerd/config.toml"
 containerd_conf_file_backup="${containerd_conf_file}.bak"
 
+kata_default_path="/opt/kata"
+kata_path=${KATA_INSTALL_PATH:-$kata_default_path}
+
 shims=(
 	"fc"
 	"qemu"
@@ -49,8 +52,12 @@ function get_container_runtime() {
 
 function install_artifacts() {
 	echo "copying kata artifacts onto host"
-	cp -a /opt/kata-artifacts/opt/kata/* /opt/kata/
-	chmod +x /opt/kata/bin/*
+	cp -a /opt/kata-artifacts/opt/kata/* ${kata_path}/
+	chmod +x ${kata_path}/bin/*
+	
+	# change kata installation if KATA_INSTALL_PATH is defined
+	sed -i -- 's~/opt/kata~'"${kata_path}"'~g' ${kata_path}/share/defaults/kata-containers/configuration*
+
 }
 
 function configure_cri_runtime() {
@@ -71,7 +78,7 @@ function configure_cri_runtime() {
 function configure_different_shims_base() {
 	# Currently containerd has an assumption on the location of the shimv2 implementation
 	# This forces kata-deploy to create files in a well-defined location that's part of
-	# the PATH, pointing to the containerd-shim-kata-v2 binary in /opt/kata/bin
+	# the PATH, pointing to the containerd-shim-kata-v2 binary in ${kata_path}/bin
 	# Issues:
 	#   https://github.com/containerd/containerd/issues/3073
 	#   https://github.com/containerd/containerd/issues/5006
@@ -94,7 +101,7 @@ function configure_different_shims_base() {
 
 		cat << EOT | tee "$shim_file"
 #!/bin/bash
-KATA_CONF_FILE=/opt/kata/share/defaults/kata-containers/configuration-${shim}.toml /opt/kata/bin/containerd-shim-kata-v2 "\$@"
+KATA_CONF_FILE=${kata_path}/share/defaults/kata-containers/configuration-${shim}.toml ${kata_path}/bin/containerd-shim-kata-v2 "\$@"
 EOT
 		chmod +x "$shim_file"
 	done
@@ -164,7 +171,7 @@ function configure_containerd_runtime() {
 	local runtime_table="plugins.${pluginid}.containerd.runtimes.$runtime"
 	local runtime_type="io.containerd.$runtime.v2"
 	local options_table="$runtime_table.options"
-	local config_path="/opt/kata/share/defaults/kata-containers/$configuration.toml"
+	local config_path="${kata_path}/share/defaults/kata-containers/$configuration.toml"
 	if grep -q "\[$runtime_table\]" $containerd_conf_file; then
 		echo "Configuration exists for $runtime_table, overwriting"
 		sed -i "/\[$runtime_table\]/,+1s#runtime_type.*#runtime_type = \"${runtime_type}\"#" $containerd_conf_file
@@ -209,7 +216,7 @@ function configure_containerd() {
 
 function remove_artifacts() {
 	echo "deleting kata artifacts"
-	rm -rf /opt/kata/
+	rm -rf ${kata_path}/
 }
 
 function cleanup_cri_runtime() {
