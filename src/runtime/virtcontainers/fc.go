@@ -351,7 +351,6 @@ func (fc *firecracker) hasAccel(ctx context.Context) *vaccel.Vaccel {
 					VaccelPath: fc.config.MachineAcceleratorsPath,
 					SocketPort: fc.config.VaccelVsockPort,
 				}
-				fc.Logger().Info("hasAccel: vsock")
 				return vaccel
 			case "vaccel-virtio":
 				// TODO
@@ -360,8 +359,6 @@ func (fc *firecracker) hasAccel(ctx context.Context) *vaccel.Vaccel {
 					HostBackend: "libvaccel-" + fc.config.VaccelHostBackend + ".so",
 					VaccelPath: fc.config.MachineAcceleratorsPath,
 				}
-				//fc.Logger().Warnf("Acceleration Framework not supported %s", accelerator)
-				fc.Logger().Info("hasAccel: virtio")
 				return vaccel
 			default:
 				fc.Logger().Warnf("Acceleration Framework not defined %s", accelerator)
@@ -378,7 +375,6 @@ func (fc *firecracker) fcInit(ctx context.Context, timeout int) error {
 	defer span.End()
 
 	var err error
-	fc.Logger().Info("In fcInit")
 	//FC version set and check
 	if fc.info.Version, err = fc.getVersionNumber(); err != nil {
 		return err
@@ -421,7 +417,6 @@ func (fc *firecracker) fcInit(ctx context.Context, timeout int) error {
 		args = append(args,
 			"--api-sock", fc.socketPath,
 			"--config-file", fc.fcConfigPath)
-		fc.Logger().Info("appended args")
 
 		// firecracker with virtio vaccel works only with seccomp 0 lvl
 		if fc.accelerator != nil && fc.accelerator.GuestBackend == "virtio" {
@@ -430,7 +425,6 @@ func (fc *firecracker) fcInit(ctx context.Context, timeout int) error {
 		cmd = exec.Command(fc.config.HypervisorPath, args...)
 
 		if fc.accelerator != nil && fc.accelerator.GuestBackend == "virtio" {
-			fc.Logger().Info("appended env for virtio")
 		        vaccel_backends := "VACCEL_BACKENDS=" + filepath.Join(fc.accelerator.VaccelPath, "lib", fc.accelerator.HostBackend)
 			cmd.Env = os.Environ()
 		        cmd.Env = append(cmd.Env, vaccel_backends)
@@ -455,7 +449,6 @@ func (fc *firecracker) fcInit(ctx context.Context, timeout int) error {
 		fc.Logger().WithField("Error starting firecracker", err).Debug()
 		return err
 	}
-	fc.Logger().Info("started firecracker")
 
 	fc.info.PID = cmd.Process.Pid
 	fc.firecrackerd = cmd
@@ -841,7 +834,6 @@ func (fc *firecracker) startSandbox(ctx context.Context, timeout int) error {
 	}
 	defer label.SetProcessLabel("")
 
-	fc.Logger().Info("calling FcInit")
 	err = fc.fcInit(ctx, fcTimeout)
 	if err != nil {
 		return err
