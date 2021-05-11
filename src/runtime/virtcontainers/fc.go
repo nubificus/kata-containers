@@ -344,24 +344,18 @@ func (fc *firecracker) hasAccel(ctx context.Context) *vaccel.Vaccel {
         if accelerators != "" {
 		for _, accelerator := range strings.Split(accelerators, ",") {
 	                switch strings.TrimSpace(accelerator){
-			case "vaccel-vsock":
+			case "vaccel":
 				vaccel := &vaccel.Vaccel{
-					GuestBackend: "vsock",
-					HostBackend: "libvaccel-" + fc.config.VaccelHostBackend + ".so",
-					VaccelPath: fc.config.MachineAcceleratorsPath,
-					SocketPort: fc.config.VaccelVsockPort,
+					GuestBackend: fc.config.VaccelGuestBackend,
+					HostBackends: fc.config.VaccelHostBackends,
+					VaccelPath: fc.config.VaccelPath,
 				}
-				return vaccel
-			case "vaccel-virtio":
-				// TODO
-				vaccel := &vaccel.Vaccel{
-					GuestBackend: "virtio",
-					HostBackend: "libvaccel-" + fc.config.VaccelHostBackend + ".so",
-					VaccelPath: fc.config.MachineAcceleratorsPath,
+				if vaccel.GuestBackend == "vsock" {
+					vaccel.SocketPort = fc.config.VaccelVsockPort
 				}
 				return vaccel
 			default:
-				fc.Logger().Warnf("Acceleration Framework not defined %s", accelerator)
+				fc.Logger().Warnf("Acceleration Framework not supported %s", accelerator)
 				break
 			}
 		}
@@ -418,21 +412,14 @@ func (fc *firecracker) fcInit(ctx context.Context, timeout int) error {
 			"--api-sock", fc.socketPath,
 			"--config-file", fc.fcConfigPath)
 
-		// firecracker with virtio vaccel works only with seccomp 0 lvl
-		if fc.accelerator != nil && fc.accelerator.GuestBackend == "virtio" {
-			args = append(args, "--seccomp-level", "0")
-		}
 		cmd = exec.Command(fc.config.HypervisorPath, args...)
 
 		if fc.accelerator != nil && fc.accelerator.GuestBackend == "virtio" {
-		        vaccel_backends := "VACCEL_BACKENDS=" + filepath.Join(fc.accelerator.VaccelPath, "lib", fc.accelerator.HostBackend)
+			// firecracker with virtio vaccel works only with seccomp 0 lvl
+			cmd.Args = append(cmd.Args, "--seccomp-level", "0")
+			// append cmd environment with vAccel specific env vars
 			cmd.Env = os.Environ()
-		        cmd.Env = append(cmd.Env, vaccel_backends)
-			if fc.accelerator.HostBackend == "jetson" {
-				vaccel_imagenet := "VACCEL_IMAGENET_NETWORKS=" + filepath.Join(fc.accelerator.VaccelPath, "share/data/networks")
-				cuda_cache := "CUDA_CACHE_PATH=/tmp/"
-				cmd.Env = append(cmd.Env, vaccel_imagenet, cuda_cache)
-			}
+		        cmd.Env = append(cmd.Env, fc.accelerator.VaccelEnv()...)
 		}
 	}
 

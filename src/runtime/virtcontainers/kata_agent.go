@@ -1410,21 +1410,17 @@ func (k *kataAgent) createContainer(ctx context.Context, sandbox *Sandbox, c *Co
 
 	hconfig := sandbox.hypervisor.hypervisorConfig()
 	accelerators := hconfig.MachineAccelerators
-	if accelerators != "" {
-		for _, accelerator := range strings.Split(accelerators, ",") {
-			switch strings.TrimSpace(accelerator) {
-			case "vaccel-vsock":
+	if strings.Contains(accelerators, "vaccel") {
+			switch hconfig.VaccelGuestBackend {
+			case "vsock":
 				vaccel_port := hconfig.VaccelVsockPort
 				vaccel_vport := "VACCEL_VSOCK=vsock://2:" + strconv.FormatUint(uint64(vaccel_port), 10)
 				grpcSpec.Process.Env = append(grpcSpec.Process.Env, vaccel_vport)
-				break
-			case "vaccel-virtio":
+			case "virtio":
 				// append /dev/accel to OCI Spec req and hopefully kata-agent will do the rest and find
 				// the major/minor numbers inside the VM
 				ctrDevices = append(ctrDevices, k.VaccelVirtioDevice(grpcSpec))
 			}
-		}
-
 	}
 
 	req := &grpc.CreateContainerRequest{
