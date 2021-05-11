@@ -28,14 +28,26 @@ COPY --from=artifacts /vaccel/lib/libvaccel-noop.so ${VACCEL_DESTINATION}/lib/
 COPY --from=artifacts /vaccel/lib/libvaccel.so ${VACCEL_DESTINATION}/lib/
 COPY --from=artifacts /vaccel/bin/containerd-shim-kata-v2 ${VACCEL_DESTINATION}/bin/containerd-shim-kata-v2
 
-# virtio_accel artifacts
-COPY --from=artifacts /vaccel/bin/firecracker ${VACCEL_DESTINATION}/bin/firecracker-vaccel
-COPY --from=artifacts /vaccel/share/kata-containers.img ${VACCEL_DESTINATION}/share/kata-containers/kata-containers-virtio_accel.img
-COPY --from=artifacts /vaccel/share/vmlinux-kata-fc ${VACCEL_DESTINATION}/share/kata-containers/vmlinux-virtio_accel
-
 # shim configuration (default: vaccel vsock transport)
 COPY --from=artifacts /vaccel/share/configuration-fc.toml ${VACCEL_DESTINATION}/share/defaults/kata-containers/configuration-fc-vaccel.toml
-COPY --from=artifacts /vaccel/share/configuration-fc.toml ${VACCEL_DESTINATION}/share/defaults/kata-containers/configuration-fc-vaccel-virtio.toml
+
+# Install binaries and configuration for vAccel virtio transport (virtio_accel)
+ARG FCVACCEL=${VACCEL_DESTINATION}/bin/firecracker-vaccel
+ARG LINUX_VACCEL=${VACCEL_DESTINATION}/share/kata-containers/vmlinux-virtio_accel
+ARG ROOTFS_VACCEL=${VACCEL_DESTINATION}/share/kata-containers/kata-containers-virtio_accel.img
+ARG FC_VIRTIO_ACCEL_CONFIG=${VACCEL_DESTINATION}/share/defaults/kata-containers/configuration-fc-vaccel-virtio.toml
+
+COPY --from=artifacts /vaccel/bin/firecracker ${FCVACCEL}
+COPY --from=artifacts /vaccel/share/kata-containers.img ${ROOTFS_VACCEL}
+COPY --from=artifacts /vaccel/share/vmlinux-kata-fc ${LINUX_VACCEL}
+COPY --from=artifacts /vaccel/share/configuration-fc.toml ${FC_VIRTIO_ACCEL_CONFIG}
+
+RUN \
+sed -i -- 's~bin/firecracker~bin/firecracker-vaccel~g' ${FC_VIRTIO_ACCEL_CONFIG} && \
+sed -i -- 's~vmlinux.container~vmlinux-virtio_accel~g' ${FC_VIRTIO_ACCEL_CONFIG} && \
+sed -i -- 's~kata-containers.img~kata-containers-virtio_accel.img~g' ${FC_VIRTIO_ACCEL_CONFIG} && \
+sed -i -- 's~="vaccel-vsock"~="vaccel-virtio"~g' ${FC_VIRTIO_ACCEL_CONFIG}
+
 
 # Install kata release artifacts to container image
 COPY --from=artifacts /kata/opt/kata/bin/firecracker/ ${VACCEL_DESTINATION}/bin/firecracker
