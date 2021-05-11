@@ -238,6 +238,9 @@ github.com/matttproud/golang_protobuf_extensions/pbutil
 github.com/mdlayher/vsock
 # github.com/mitchellh/mapstructure v1.1.2
 github.com/mitchellh/mapstructure
+# github.com/nubificus/vaccel-go-runtime v0.0.0-20210511131433-4bf5939c8c51
+## explicit
+github.com/nubificus/vaccel-go-runtime/vaccel
 # github.com/opencontainers/go-digest v1.0.0-rc1
 github.com/opencontainers/go-digest
 # github.com/opencontainers/image-spec v1.0.1

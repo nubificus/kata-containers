@@ -33,6 +33,7 @@ require (
 	github.com/hashicorp/go-multierror v1.0.0
 	github.com/kata-containers/govmm v0.0.0-20210428163604-f0e9a35308ee
 	github.com/mdlayher/vsock v0.0.0-20191108225356-d9c65923cb8f
+	github.com/nubificus/vaccel-go-runtime v0.0.0-20210511131433-4bf5939c8c51
 	github.com/opencontainers/image-spec v1.0.1 // indirect
 	github.com/opencontainers/runc v1.0.0-rc9.0.20200102164712-2b52db75279c
 	github.com/opencontainers/runtime-spec v1.0.2-0.20190408193819-a1b50f621a48
