@@ -48,9 +48,9 @@ func (vaccel *Vaccel) VaccelEnv() []string {
 
 	vaccelrtLibs := filepath.Join(vaccel.VaccelPath, "lib")
 	for _, backend := range strings.Split(vaccel.HostBackends, ",") {
-		vaccelrtBack += filepath.Join(vaccelrtLibs, "libvaccel-" + strings.TrimSpace(backend) + ".so") + ","
+		vaccelrtBack += filepath.Join(vaccelrtLibs, "libvaccel-" + strings.TrimSpace(backend) + ".so") + ";"
 	}
-	vaccel_backends := "VACCEL_BACKENDS=" + vaccelrtBack
+	vaccel_backends := "VACCEL_BACKENDS=" + strings.TrimSuffix(vaccelrtBack,";")
 	ld_path := "LD_LIBRARY_PATH=" + vaccelrtLibs
 
 	vaccelEnv = append(vaccelEnv, vaccel_backends, ld_path)
