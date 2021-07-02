@@ -910,7 +910,7 @@ func (fc *firecracker) stopSandbox(ctx context.Context, waitOnly bool) (err erro
 	span, _ := fc.trace(ctx, "stopSandbox")
 	defer span.End()
 
-	if fc.accelerator != nil {
+        if fc.accelerator != nil && fc.accelerator.GuestBackend == "vsock" {
 		if err := fc.accelerator.VaccelEnd(); err != nil {
 			return err
 		}
