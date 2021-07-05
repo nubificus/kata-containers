@@ -279,13 +279,12 @@ func (h hypervisor) vaccelVsockPort() uint32 {
 }
 
 func (h hypervisor) vaccelHostBackends() string {
-	hb := h.VaccelHostBackends
 
-	if hb == "" {
-		hb = defaultVaccelHostBackend
+	if h.VaccelHostBackends == "" {
+		return defaultVaccelHostBackend
 	}
 
-	return hb
+	return h.VaccelHostBackends
 }
 
 func (h hypervisor) cpuFeatures() string {
