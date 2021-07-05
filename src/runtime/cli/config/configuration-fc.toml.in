@@ -55,7 +55,7 @@ vaccel_path="@VACCELPATH@"
 # vaccel_guest_backend can be one of "virtio" or "vsock"
 # Your distribution recommends: vaccel_host_backend = @VACCELHOSTBACKEND@
 # Your distribution recommends: vaccel_guest_backend = @VACCELGUESTBACKEND@
-vaccel_host_backend = "@VACCELHOSTBACKEND@"
+vaccel_host_backends = "@VACCELHOSTBACKEND@"
 vaccel_guest_backend = "@VACCELGUESTBACKEND@"
 
 # If vaccel_guest_backend=vsock specify the vAccel Agent vsock port
