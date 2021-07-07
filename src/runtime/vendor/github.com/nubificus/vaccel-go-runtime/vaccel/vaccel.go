@@ -48,16 +48,17 @@ func (vaccel *Vaccel) VaccelEnv() []string {
 
 	vaccelrtLibs := filepath.Join(vaccel.VaccelPath, "lib")
 	for _, backend := range strings.Split(vaccel.HostBackends, ",") {
-		vaccelrtBack += filepath.Join(vaccelrtLibs, "libvaccel-" + strings.TrimSpace(backend) + ".so") + ";"
+		vaccelrtBack += filepath.Join(vaccelrtLibs, "libvaccel-" + strings.TrimSpace(backend) + ".so") + ":"
 	}
-	vaccel_backends := "VACCEL_BACKENDS=" + strings.TrimSuffix(vaccelrtBack,";")
+
+	vaccel_backends := "VACCEL_BACKENDS=" + strings.TrimSuffix(vaccelrtBack,":")
 	ld_path := "LD_LIBRARY_PATH=" + vaccelrtLibs
 
 	vaccelEnv = append(vaccelEnv, vaccel_backends, ld_path)
 
 	if strings.Contains(vaccel.HostBackends, "jetson") {
 		vaccel_imagenet := "VACCEL_IMAGENET_NETWORKS=" + filepath.Join(vaccel.VaccelPath, "share/data/networks")
-		cuda_cache := "CUDA_CACHE_PATH=/tmp/"
+		cuda_cache := "CUDA_CACHE_PATH=/tmp"
 		vaccelEnv = append(vaccelEnv, vaccel_imagenet, cuda_cache)
         }
 
