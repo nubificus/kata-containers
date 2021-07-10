@@ -16,7 +16,7 @@ spec:
       serviceAccountName: kata-label-node
       containers:
       - name: kube-kata
-        image: katadocker/kata-deploy:2.1.0-rc0
+        image: registry.nubificus.co.uk/kata-vaccel-deploy:testing
         imagePullPolicy: Always
         lifecycle:
           preStop:
@@ -63,6 +63,7 @@ spec:
         - name: local-bin
           hostPath:
             path: /usr/local/bin/
+      imagePullSecrets: nbfcreg
   updateStrategy:
     rollingUpdate:
       maxUnavailable: 1

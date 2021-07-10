@@ -1,0 +1,7 @@
+FROM ubuntu:16.04
+ARG SMB_PASS
+ARG SMB_USER
+# Creates a new User
+RUN useradd -ms /bin/bash $SMB_USER
+# Enters the password twice.
+RUN echo "$SMB_PASS\n$SMB_PASS" 

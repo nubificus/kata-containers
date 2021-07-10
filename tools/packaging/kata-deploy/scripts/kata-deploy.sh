@@ -56,17 +56,17 @@ function install_artifacts() {
 	chmod +x ${kata_path}/bin/*
 
 	sed -i -- 's~/opt/kata~'"${kata_path}"'~g' ${kata_path}/share/defaults/kata-containers/configuration*
-
-	echo "Installing vAccel runtime to host"
+	
+	#echo "Installing vAccel runtime to host"
         # Hypervisor (Firecracker vAccel Virtio) and vaccelrt-agent binaries are linked
         # against Vaccel Runtime. Create a link to libvaccel.so in a systems runtime
         # library path (usr/local/lib)
-        local libvaccel_link="/usr/local/lib/libvaccel.so"
-        if [ -L "${libvaccel_link}" ]; then
-                echo "warning: /usr/local/lib/libvaccel.so already exists"
-        else
-                ln -sf ${kata_path}/lib/libvaccel.so /usr/local/lib/libvaccel.so
-        fi
+        #local libvaccel_link="/usr/local/lib/libvaccel.so"
+        #if [ -L "${libvaccel_link}" ]; then
+        #        echo "warning: /usr/local/lib/libvaccel.so already exists"
+        #else
+        #        ln -sf ${kata_path}/lib/libvaccel.so /usr/local/lib/libvaccel.so
+        #fi
         echo "Finished vAccel artifacts installation on host"
 
 }
@@ -112,7 +112,7 @@ function configure_different_shims_base() {
 
 		cat << EOT | tee "$shim_file"
 #!/bin/bash
-KATA_CONF_FILE=${kata_path}/share/defaults/kata-containers/configuration-${shim}.toml ${kata_path}/bin/containerd-shim-kata-v2 "\$@"
+LD_LIBRARY_PATH=${kata_path}/lib KATA_CONF_FILE=${kata_path}/share/defaults/kata-containers/configuration-${shim}.toml ${kata_path}/bin/containerd-shim-kata-v2 "\$@"
 EOT
 		chmod +x "$shim_file"
 	done
