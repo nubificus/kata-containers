@@ -23,7 +23,7 @@ RUN mkdir /kata && \
 RUN wget ${VACCEL_ARTIFACTS_URL} && \
     unzip vaccel_${ARCHTAG}_Release.zip -d /vaccel
 
-FROM ubuntu:latest
+FROM nubificus/systemd
 ARG ARCHTAG
 RUN echo ARCH="$ARCHTAG"
 ARG KUBE_ARCH=arm64
@@ -68,7 +68,6 @@ ln -s vmlinux.container.virtio vmlinux.container
 
 RUN chown -R root:root ${VACCEL_DESTINATION}/
 
-RUN apt update && apt install -y curl
 #Add kubectl binary
 RUN \
 curl -Lso /bin/kubectl https://storage.googleapis.com/kubernetes-release/release/$(curl -s https://storage.googleapis.com/kubernetes-release/release/stable.txt)/bin/linux/${KUBE_ARCH}/kubectl && \

@@ -228,8 +228,8 @@ function configure_containerd() {
 function remove_artifacts() {
 	echo "deleting kata artifacts"
 	rm -rf ${kata_path}
-	echo "deleting libvaccel.so link from /usr/local/lib"
-        rm -f /usr/local/lib/libvaccel.so
+	#echo "deleting libvaccel.so link from /usr/local/lib"
+        #rm -f /usr/local/lib/libvaccel.so
 
 }
 
