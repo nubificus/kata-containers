@@ -1,0 +1,39 @@
+---
+kind: RuntimeClass
+apiVersion: node.k8s.io/v1beta1
+metadata:
+    name: kata-fc
+handler: kata-fc
+overhead:
+    podFixed:
+        memory: "130Mi"
+        cpu: "250m"
+scheduling:
+  nodeSelector:
+    katacontainers.io/kata-runtime: "true"
+---
+kind: RuntimeClass
+apiVersion: node.k8s.io/v1beta1
+metadata:
+    name: kata-fc-vaccel
+handler: kata-fc-vaccel
+overhead:
+    podFixed:
+        memory: "130Mi"
+        cpu: "250m"
+scheduling:
+  nodeSelector:
+    katacontainers.io/kata-runtime: "true"
+---
+kind: RuntimeClass
+apiVersion: node.k8s.io/v1beta1
+metadata:
+    name: kata-fc-vaccel-virtio
+handler: kata-fc-vaccel-virtio
+overhead:
+    podFixed:
+        memory: "130Mi"
+        cpu: "250m"
+scheduling:
+  nodeSelector:
+    katacontainers.io/kata-runtime: "true"
