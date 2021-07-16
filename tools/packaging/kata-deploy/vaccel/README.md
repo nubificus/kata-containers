@@ -1,3 +1,5 @@
+## Install Kata with vAccel
+
 Label each node where vAccel-kata should be deployed:
 
 ```
@@ -24,14 +26,14 @@ kubectl apply -f kata-vaccel-rc.yaml
 
 The RuntimeClass config uses the katacontainers.io/kata-runtime: "true" nodeSelector from the previous step. Pods using this RuntimeClass can only be scheduled to a node matched by this selector. The RuntimeClass nodeSelector is merged with a pod’s existing nodeSelector. Any conflicts will cause the pod to be rejected in admission. At the end any pod using one of these Runtime Classes can only be scheduled in a vaccel: "true" node as the deploy deamon run only on those nodes creating the extra label kata-runtime: "true"
 
-###Run the examples
+### Run the examples
 
 ```
 kubectl apply -f example-apps/classify-virtio.yaml  
 kubectl apply -f example-apps/classify-vsock.yaml
 ```
 
-###Delete kata-vaccel
+## Delete kata and vAccel
 First delete the pods using the RuntimeClasses
 
 Then,
