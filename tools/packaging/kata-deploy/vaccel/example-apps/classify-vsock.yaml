@@ -1,0 +1,25 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  labels:
+    run: classify-kata-fc-vsock
+  name: classify-kata-fc-vsock
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      run: classify-kata-fc-vsock
+  template:
+    metadata:
+      labels:
+        run: classify-kata-fc-vsock
+    spec:
+      runtimeClassName: kata-fc-vaccel
+      containers:
+      - image: nubificus/classify:testing
+        imagePullPolicy: Always
+        name: classify
+        resources:
+          requests:
+            cpu: 200m
+      restartPolicy: Always

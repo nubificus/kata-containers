@@ -44,6 +44,6 @@ sudo sh -c "echo "virtio_accel" >> ${ROOTFS_DIR}/etc/modules"
 sudo chroot ${ROOTFS_DIR} /sbin/depmod $VERSION
 cd ../image-builder
 script -fec 'sudo bash -x ./image_builder.sh $ROOTFS_DIR'
-sudo cp kata-containers.img $OUTPUT_DIR/share/kata-containers/
+sudo cp kata-containers.img $OUTPUT_DIR/share/kata-containers/kata-containers.img.virtio
 
 set +x

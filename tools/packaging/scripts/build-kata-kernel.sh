@@ -20,7 +20,7 @@ else
 	exit
 fi
 
-sudo apt update && sudo apt install -y libssl-dev
+sudo apt update && sudo apt install -y libssl-dev coreutils libelf-dev bc
 
 go get -d -u github.com/nubificus/kata-containers
 cd $GOPATH/src/github.com/nubificus/kata-containers
@@ -36,9 +36,9 @@ VERSION=`./build-kernel.sh -f setup 2>&1 |grep Kernel\ version\: | awk '{print $
 ./build-kernel.sh build
 if [[ $ARCH_KERNEL == "x86_64" ]]
 then
-	sudo cp kata-linux*/vmlinux $OUTPUT_DIR/share/kata-containers/vmlinux.container
+	sudo cp kata-linux*/vmlinux $OUTPUT_DIR/share/kata-containers/vmlinux.container.virtio
 else
-	sudo cp kata-linux*/arch/$ARCH_KERNEL/boot/Image $OUTPUT_DIR/share/kata-containers/vmlinux.container
+	sudo cp kata-linux*/arch/$ARCH_KERNEL/boot/Image $OUTPUT_DIR/share/kata-containers/vmlinux.container.virtio
 fi
 
 cd /home/runner

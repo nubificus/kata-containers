@@ -6,6 +6,10 @@ ARG ARCHTAG
 ARG VACCEL_RELEASE=latest
 ARG VACCEL_ARTIFACTS_URL=https://github.com/cloudkernels/vaccel/releases/download/${VACCEL_RELEASE}/vaccel_${ARCHTAG}_Release.zip
 
+ARG FIRECRACKER_VERSION=v0.23.1
+ARG FIRECRACKER_STATIC_URL=https://github.com/firecracker-microvm/firecracker/releases/download/${FIRECRACKER_VERSION}/firecracker-${FIRECRACKER_VERSION}-aarch64
+ARG FIRECRACKER_STATIC=firecracker-${FIRECRACKER_VERSION}-aarch64
+
 ENV DEBIAN_FRONTEND="noninteractive"
 
 RUN apt-get update && apt-get install -y wget unzip xz-utils
@@ -19,6 +23,9 @@ ARG KATA_VACCEL_ARTIFACTS=./kata-vaccel-${ARCHTAG}.tar.gz
 
 RUN mkdir /kata && \
     tar -xzvf ${KATA_VACCEL_ARTIFACTS} -C /kata/
+
+RUN wget ${FIRECRACKER_STATIC_URL} && \
+    cp ${FIRECRACKER_STATIC} /kata/bin/firecracker
 
 RUN wget ${VACCEL_ARTIFACTS_URL} && \
     unzip vaccel_${ARCHTAG}_Release.zip -d /vaccel

@@ -20,9 +20,14 @@ ENV DEBIAN_FRONTEND="noninteractive"
 
 RUN apt-get update && apt-get install -y wget unzip xz-utils
 
+# get kata release "official" 
+# we will use the rootfs & kernel for default and vsock kata-fc
 RUN wget ${KATA_ARTIFACTS_URL} && \
-    mkdir /kata-default && \
-    tar xvf kata-static-${KATA_RELEASE}-x86_64.tar.xz -C /kata-default
+    mkdir /kata-defaults && \
+    tar xvf kata-static-${KATA_RELEASE}-x86_64.tar.xz -C /kata-defaults
+#    cd /kata-default/opt/kata/share/kata-containers && \
+#    cp -L kata-containers.img kata-containers.img.source && \
+#    cp -L vmlinux.container vmlinux.container.source
 
 RUN mkdir /kata && \
     tar -xzvf ${KATA_VACCEL_ARTIFACTS} -C /kata/
@@ -30,7 +35,8 @@ RUN mkdir /kata && \
 RUN wget ${VACCEL_ARTIFACTS_URL} && \
     unzip vaccel_${ARCHTAG}_Release.zip -d /vaccel
 
-FROM nubificus/systemd
+FROM centos/systemd
+#FROM nubificus/systemd
 ARG ARCHTAG
 RUN echo ARCH="$ARCHTAG"
 ARG KUBE_ARCH=amd64
@@ -70,6 +76,7 @@ sed -i -- 's~kata-containers.img~kata-containers.img.virtio~g' ${FC_VIRTIO_ACCEL
 
 COPY --from=artifacts /kata-defaults/opt/kata/share/kata-containers/vmlinux.container ${VACCEL_DESTINATION}/share/kata-containers/vmlinux.container
 COPY --from=artifacts /kata-defaults/opt/kata/share/kata-containers/kata-containers.img ${VACCEL_DESTINATION}/share/kata-containers/kata-containers.img
+COPY --from=artifacts /kata-defaults/opt/kata/bin/firecracker ${VACCEL_DESTINATION}/bin/firecracker
 
 RUN chown -R root:root ${VACCEL_DESTINATION}/
 
