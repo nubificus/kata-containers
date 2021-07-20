@@ -268,7 +268,7 @@ function reset_runtime() {
 }
 
 function installation_check() {
-	local katalabel=$(kubectl get $NODE_NAME -o jsonpath='{.metadata.labels}' | grep -Po '"katacontainers.io/kata-runtime":.*?[^\\]"')
+	local katalabel=$(kubectl get node $NODE_NAME -o jsonpath='{.metadata.labels}' | grep -Po '"katacontainers.io/kata-runtime":.*?[^\\]"')
 
 	if echo "$katalabel" | grep -qE 'true'; then
         	echo "This node is already labeled as kata-runtime=true. Uninstall kata
