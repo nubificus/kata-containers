@@ -267,6 +267,19 @@ function reset_runtime() {
 	fi
 }
 
+function installation_check() {
+	local katalabel=$(kubectl get $NODE_NAME -o jsonpath='{.metadata.labels}' | grep -Po '"katacontainers.io/kata-runtime":.*?[^\\]"')
+
+	if echo "$katalabel" | grep -qE 'true'; then
+        	echo "This node is already labeled as kata-runtime=true. Uninstall kata
+		and delete the label in order to run the installation again."
+		sleep infinity
+	else
+        	echo "Installation check finished: Kata not found. Continue installation process"
+	fi
+
+}
+
 function main() {
 	# script requires that user is root
 	euid=$(id -u)
@@ -300,7 +313,7 @@ function main() {
 
 		case "$action" in
 		install)
-
+			installation_check
 			install_artifacts
 			configure_cri_runtime "$runtime"
 			kubectl label node "$NODE_NAME" --overwrite katacontainers.io/kata-runtime=true
