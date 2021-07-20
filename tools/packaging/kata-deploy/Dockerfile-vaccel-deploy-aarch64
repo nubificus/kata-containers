@@ -25,7 +25,7 @@ RUN mkdir /kata && \
     tar -xzvf ${KATA_VACCEL_ARTIFACTS} -C /kata/
 
 RUN wget ${FIRECRACKER_STATIC_URL} && \
-    cp ${FIRECRACKER_STATIC} /kata/bin/firecracker
+    cp ${FIRECRACKER_STATIC} /kata/opt/kata/bin/firecracker
 
 RUN wget ${VACCEL_ARTIFACTS_URL} && \
     unzip vaccel_${ARCHTAG}_Release.zip -d /vaccel
