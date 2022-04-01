@@ -15,6 +15,10 @@
 - `qemu`
 - `cloud-hypervisor`
 - `firecracker`
+   In the case of `firecracker` the use of a block device snapshotter is needed
+   for the VM rootfs. Refer to the following guide for additional configuration
+   steps:
+   - [Setup Kata containers with `firecracker`](how-to-use-kata-containers-with-firecracker.md)
 - `ACRN`
 
   While `qemu` , `cloud-hypervisor` and `firecracker` work out of the box with installation of Kata,
@@ -22,10 +26,6 @@
   Refer to the following guides for additional configuration steps:
 - [Kata Containers with ACRN Hypervisor](how-to-use-kata-containers-with-acrn.md)
 
-  In the case of `firecracker` the use of a block device snapshotter is needed
-  for the VM rootfs. Refer to the following guide for additional configuration
-  steps:
-- [Setup Kata containers with `firecracker`](how-to-use-kata-containers-with-firecracker.md)
 
 ## Advanced Topics
 
