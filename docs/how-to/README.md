@@ -15,6 +15,7 @@
 - `qemu`
 - `cloud-hypervisor`
 - `firecracker`
+
    In the case of `firecracker` the use of a block device snapshotter is needed
    for the VM rootfs. Refer to the following guide for additional configuration
    steps:
