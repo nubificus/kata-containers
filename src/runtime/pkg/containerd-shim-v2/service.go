@@ -34,6 +34,8 @@ import (
 	vc "github.com/kata-containers/kata-containers/src/runtime/virtcontainers"
 	"github.com/kata-containers/kata-containers/src/runtime/virtcontainers/pkg/compatoci"
 	"github.com/kata-containers/kata-containers/src/runtime/virtcontainers/types"
+
+	urunc "github.com/kata-containers/kata-containers/src/runtime/pkg/urunc"
 )
 
 // shimTracingTags defines tags for the trace span
@@ -356,6 +358,8 @@ func (s *service) Cleanup(ctx context.Context) (_ *taskAPI.DeleteResponse, err e
 // Create a new sandbox or container with the underlying OCI runtime
 func (s *service) Create(ctx context.Context, r *taskAPI.CreateTaskRequest) (_ *taskAPI.CreateTaskResponse, err error) {
 	shimLog.WithField("container", r.ID).Debug("Create() start")
+	shimLog.WithField("src", "uruncio").WithField("container", r.ID).Error(" start")
+
 	defer shimLog.WithField("container", r.ID).Debug("Create() end")
 	start := time.Now()
 	defer func() {
@@ -389,6 +393,10 @@ func (s *service) Create(ctx context.Context, r *taskAPI.CreateTaskRequest) (_ *
 		}
 		container := res.container
 		container.status = task.StatusCreated
+		shimLog.WithField("src", "uruncio").WithField("kernelPath", s.config.HypervisorConfig.KernelPath).Error("pkg/service.go/Create")
+
+		uruncImported := urunc.Hello()
+		shimLog.WithField("src", "uruncio").WithField("uruncImported", uruncImported).Error("pkg/service.go/Create")
 
 		s.containers[r.ID] = container
 
@@ -436,6 +444,8 @@ func (s *service) Start(ctx context.Context, r *taskAPI.StartRequest) (_ *taskAP
 	// hold the send lock so that the start events are sent before any exit events in the error case
 	s.eventSendMu.Lock()
 	defer s.eventSendMu.Unlock()
+
+	shimLog.WithField("src", "uruncio").WithField("kernelPath", s.config.HypervisorConfig.KernelPath).Error("pkg/service.go/Start")
 
 	//start a container
 	if r.ExecID == "" {

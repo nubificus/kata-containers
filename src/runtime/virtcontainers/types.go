@@ -21,6 +21,7 @@ const (
 	// UnknownContainerType specifies a container that provides container type annotation, but
 	// it is unknown.
 	UnknownContainerType ContainerType = "unknown_container_type"
+	// UnikernelContainer type perhaps (?)
 )
 
 // IsSandbox determines if the container type can be considered as a sandbox.

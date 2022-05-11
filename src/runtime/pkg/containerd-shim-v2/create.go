@@ -48,6 +48,7 @@ var defaultStartManagementServerFunc startManagementServerFunc = func(s *service
 }
 
 func create(ctx context.Context, s *service, r *taskAPI.CreateTaskRequest) (*container, error) {
+	shimLog.WithField("src", "uruncio").Error("pkg/create.go/create")
 	rootFs := vc.RootFs{}
 	if len(r.Rootfs) == 1 {
 		m := r.Rootfs[0]
@@ -189,6 +190,7 @@ func create(ctx context.Context, s *service, r *taskAPI.CreateTaskRequest) (*con
 	if err != nil {
 		return nil, err
 	}
+	shimLog.WithField("src", "uruncio").WithField("unikernel", s.config.HypervisorConfig.Unikernel).Error("pkg/create.go/create")
 
 	return container, nil
 }

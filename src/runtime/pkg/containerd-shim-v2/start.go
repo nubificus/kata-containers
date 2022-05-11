@@ -8,6 +8,7 @@ package containerdshim
 import (
 	"context"
 	"fmt"
+
 	"github.com/sirupsen/logrus"
 
 	"github.com/containerd/containerd/api/types/task"
@@ -30,8 +31,13 @@ func startContainer(ctx context.Context, s *service, c *container) (retErr error
 
 	if s.sandbox == nil {
 		err := fmt.Errorf("Bug, the sandbox hasn't been created for this container %s", c.id)
+		shimLog.WithField("src", "uruncio").WithField("message", "s.sandbox is nil").Error("pkg/start.go/startContainer")
+
 		return err
 	}
+	shimLog.WithField("src", "uruncio").WithField("message", "s.sandbox was not nil").Error("pkg/start.go/startContainer")
+
+	shimLog.WithField("src", "uruncio").WithField("c.cType.IsSandbox", c.cType.IsSandbox()).Error("pkg/start.go/startContainer")
 
 	if c.cType.IsSandbox() {
 		err := s.sandbox.Start(ctx)

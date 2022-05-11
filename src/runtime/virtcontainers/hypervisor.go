@@ -501,6 +501,9 @@ type HypervisorConfig struct {
 
 	// Disable selinux from the hypervisor process
 	DisableSeLinux bool
+
+	// Unikernel used to indicate that the bundle contains unikernel
+	Unikernel bool
 }
 
 // vcpu mapping from vcpu number to thread number

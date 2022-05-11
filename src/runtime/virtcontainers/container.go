@@ -922,6 +922,7 @@ func (c *Container) start(ctx context.Context) error {
 	if err := c.checkSandboxRunning("start"); err != nil {
 		return err
 	}
+	c.Logger().WithField("src", "uruncio").WithField("containerID", c.id).Error("virtcontainers/container.go/start")
 
 	if c.state.State != types.StateReady &&
 		c.state.State != types.StateStopped {

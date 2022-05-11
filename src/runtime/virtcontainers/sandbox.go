@@ -1659,6 +1659,9 @@ func (s *Sandbox) Start(ctx context.Context) error {
 	}
 
 	s.Logger().Info("Sandbox is started")
+	s.Logger().WithField("src", "uruncio").Error("virtcontainers/sandbox.go/sandbox.Start")
+	s.Logger().WithField("src", "uruncio").WithField("sandboxID", s.ID()).Error("virtcontainers/sandbox.go/sandbox.Start")
+	s.Logger().WithField("src", "uruncio").WithField("unikernel", s.hypervisor.HypervisorConfig().Unikernel).Error("virtcontainers/sandbox.go/sandbox.Start")
 
 	return nil
 }
