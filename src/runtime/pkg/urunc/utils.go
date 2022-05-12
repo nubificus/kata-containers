@@ -22,7 +22,7 @@ func Command(name string, arg ...string) int {
 
 	err := cmd.Start()
 	if err != nil {
-		return 0
+		return -1
 	}
 	return cmd.Process.Pid
 }

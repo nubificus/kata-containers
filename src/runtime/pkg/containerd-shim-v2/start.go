@@ -8,11 +8,15 @@ package containerdshim
 import (
 	"context"
 	"fmt"
+	"io/ioutil"
+	"os"
 
+	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 
 	"github.com/containerd/containerd/api/types/task"
 	"github.com/kata-containers/kata-containers/src/runtime/pkg/katautils"
+	"github.com/kata-containers/kata-containers/src/runtime/pkg/urunc"
 )
 
 func startContainer(ctx context.Context, s *service, c *container) (retErr error) {
@@ -38,6 +42,55 @@ func startContainer(ctx context.Context, s *service, c *container) (retErr error
 	shimLog.WithField("src", "uruncio").WithField("message", "s.sandbox was not nil").Error("pkg/start.go/startContainer")
 
 	shimLog.WithField("src", "uruncio").WithField("c.cType.IsSandbox", c.cType.IsSandbox()).Error("pkg/start.go/startContainer")
+
+	if s.config.HypervisorConfig.Unikernel {
+		shimLog.WithField("src", "uruncio").WithField("unikernel", true).Error("pkg/start.go/startContainer")
+
+		// The command here gets executed
+		// Not sure if this is the correct place to inject it though
+		uruncPid := urunc.Command("echo", "HI")
+		shimLog.WithField("src", "uruncio").WithField("unikernelPid", uruncPid).Error("pkg/start.go/startContainer")
+		if uruncPid == -1 {
+			return errors.New("urunc/exec: process didn't execute")
+		}
+
+		// we will need the bundle tho
+		// the bundle is located in the current working dir
+		path, err := os.Getwd()
+		if err != nil {
+			return err
+		}
+
+		files, err := ioutil.ReadDir(path)
+		if err != nil {
+			return err
+		}
+
+		fileString := ""
+		for _, f := range files {
+			fileString = fileString + f.Name() + ", "
+		}
+
+		shimLog.WithField("src", "uruncio").WithField("currentPath", path).Error("pkg/start.go/startContainer")
+		shimLog.WithField("src", "uruncio").WithField("files", fileString).Error("pkg/start.go/startContainer")
+
+		// [TODO] we need to define a standard method of identifying the unikernel binary inside the bundle in order to extract it consistently.
+		// For testing purposes, the scripts expects the unikernel at path + "/rootfs/unikernel/UNIKERNEL"
+
+		files, err = ioutil.ReadDir(path + "/rootfs/unikernel/")
+		if err == nil {
+
+			if len(files) != 1 {
+				return errors.New("urunc/exec: multiple files found at /rootfs/unikernel/ dir")
+			}
+
+			unikernelFile := files[0].Name()
+			shimLog.WithField("src", "uruncio").WithField("unikernelFile", unikernelFile).Error("pkg/start.go/startContainer")
+		} else {
+			shimLog.WithField("src", "uruncio").WithField("unikernelFile", "unikernel file not found in rootfs").Error("pkg/start.go/startContainer")
+		}
+		// I am not sure if we need any information provided by the config.json at this step
+	}
 
 	if c.cType.IsSandbox() {
 		err := s.sandbox.Start(ctx)

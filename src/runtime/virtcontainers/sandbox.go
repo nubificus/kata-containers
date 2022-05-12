@@ -1357,6 +1357,10 @@ func (s *Sandbox) StartContainer(ctx context.Context, containerID string) (VCCon
 		return nil, err
 	}
 
+	s.Logger().WithField("src", "uruncio").Error("virtcontainers/sandbox.go/StartContainer")
+	unikernel := s.hypervisor.HypervisorConfig().Unikernel
+	s.Logger().WithField("src", "uruncio").WithField("unikernel", unikernel).Error("virtcontainers/sandbox.go/StartContainer")
+
 	// Start it.
 	if err = c.start(ctx); err != nil {
 		return nil, err
@@ -1367,6 +1371,7 @@ func (s *Sandbox) StartContainer(ctx context.Context, containerID string) (VCCon
 	}
 
 	s.Logger().WithField("container", containerID).Info("Container is started")
+	s.Logger().WithField("src", "uruncio").Error("virtcontainers/sandbox.go/StartContainer")
 
 	// Update sandbox resources in case a stopped container
 	// is started
@@ -1635,6 +1640,8 @@ func (s *Sandbox) Start(ctx context.Context) error {
 	if err := s.state.ValidTransition(s.state.State, types.StateRunning); err != nil {
 		return err
 	}
+	unikernel := s.hypervisor.HypervisorConfig().Unikernel
+	s.Logger().WithField("src", "uruncio").WithField("unikernel", unikernel).Error("virtcontainers/sandbox.go/Start")
 
 	prevState := s.state.State
 
