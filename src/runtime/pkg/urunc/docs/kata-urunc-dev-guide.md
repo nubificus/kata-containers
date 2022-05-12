@@ -107,7 +107,7 @@ To run a test container, we need to get the image and run it using the `kata-uru
 sudo ctr images pull docker.io/library/ubuntu:latest
 sudo ctr run --runtime io.containerd.run.kata-urunc.v2 -t --rm docker.io/library/ubuntu:latest ubuntu-kata-test uname -a
 
-sudo ctr run --runtime io.containerd.run.kata-urunc.v2 -t --rm docker.io/urunc/testhello:latest urunc-kata-test
+sudo ctr run --runtime io.containerd.run.kata-urunc.v2 -t --rm docker.io/urunc/testhello:latest urunc-kata-test /unikernel/hello
 ```
 
 ## Clean up dead containers
@@ -131,11 +131,11 @@ cd nubificus/kata-containers/src/runtime/pkg/urunc/image-builder
 # To see the help message:
 ./build.sh -h
 
-# Create a urunc/testhello image containing a solo5-test-hello binary
+# Create a urunc/testhello image containing a hello
 # and import it to ctr
-./build.sh -u solo5-test-hello -i urunc/testhello -c
+./build.sh -u hello -i urunc/testhello -c
 
-# Create a urunc/testhello image containing a solo5-test-hello binary
+# Create a urunc/testhello image containing a hello
 # import it to ctr and keep the budnle .tar file
-./build.sh -u solo5-test-hello -i urunc/testhello
+./build.sh -u hello -i urunc/testhello
 ```
