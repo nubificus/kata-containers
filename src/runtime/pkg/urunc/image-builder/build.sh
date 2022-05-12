@@ -27,7 +27,7 @@ EOF
 }
 
 delete_dockerfile () {
-     -f ./Dockerfile
+    rm -f ./Dockerfile
 }
 
 build_docker_image () {
