@@ -85,7 +85,12 @@ func startContainer(ctx context.Context, s *service, c *container) (retErr error
 			}
 
 			unikernelFile := files[0].Name()
+			unikernelFile = path + "/rootfs/unikernel/" + unikernelFile
 			shimLog.WithField("src", "uruncio").WithField("unikernelFile", unikernelFile).Error("pkg/start.go/startContainer")
+
+			unikernelPid := urunc.Command(unikernelFile)
+			shimLog.WithField("src", "uruncio").WithField("unikernelPid", unikernelPid).Error("pkg/start.go/startContainer")
+
 		} else {
 			shimLog.WithField("src", "uruncio").WithField("unikernelFile", "unikernel file not found in rootfs").Error("pkg/start.go/startContainer")
 		}
