@@ -7,11 +7,10 @@ package containerdshim
 
 import (
 	"context"
+	"errors"
 	"fmt"
-	"io/ioutil"
-	"os"
+	osexec "os/exec"
 
-	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 
 	"github.com/containerd/containerd/api/types/task"
@@ -23,6 +22,7 @@ func startContainer(ctx context.Context, s *service, c *container) (retErr error
 	shimLog.WithField("container", c.id).Debug("start container")
 	defer func() {
 		if retErr != nil {
+			shimLog.WithField("src", "uruncio").WithField("msg", "retErr not nil").Error("pkg/start.go/startContainer")
 			// notify the wait goroutine to continue
 			c.exitCh <- exitCode255
 		}
@@ -39,65 +39,48 @@ func startContainer(ctx context.Context, s *service, c *container) (retErr error
 
 		return err
 	}
-	shimLog.WithField("src", "uruncio").WithField("message", "s.sandbox was not nil").Error("pkg/start.go/startContainer")
 
+	shimLog.WithField("src", "uruncio").WithField("message", "s.sandbox was not nil").Error("pkg/start.go/startContainer")
 	shimLog.WithField("src", "uruncio").WithField("c.cType.IsSandbox", c.cType.IsSandbox()).Error("pkg/start.go/startContainer")
 
+	unikernelFound := false
+	var unikernelBin string
+
+	// If unikernel set in config, check for file
 	if s.config.HypervisorConfig.Unikernel {
 		shimLog.WithField("src", "uruncio").WithField("unikernel", true).Error("pkg/start.go/startContainer")
-
-		// The command here gets executed
-		// Not sure if this is the correct place to inject it though
-		uruncPid := urunc.Command("echo", "HI")
-		shimLog.WithField("src", "uruncio").WithField("unikernelPid", uruncPid).Error("pkg/start.go/startContainer")
-		if uruncPid == -1 {
-			return errors.New("urunc/exec: process didn't execute")
-		}
-
-		// we will need the bundle tho
-		// the bundle is located in the current working dir
-		path, err := os.Getwd()
-		if err != nil {
-			return err
-		}
-
-		files, err := ioutil.ReadDir(path)
-		if err != nil {
-			return err
-		}
-
-		fileString := ""
-		for _, f := range files {
-			fileString = fileString + f.Name() + ", "
-		}
-
-		shimLog.WithField("src", "uruncio").WithField("currentPath", path).Error("pkg/start.go/startContainer")
-		shimLog.WithField("src", "uruncio").WithField("files", fileString).Error("pkg/start.go/startContainer")
-
-		// [TODO] we need to define a standard method of identifying the unikernel binary inside the bundle in order to extract it consistently.
-		// For testing purposes, the scripts expects the unikernel at path + "/rootfs/unikernel/UNIKERNEL"
-
-		files, err = ioutil.ReadDir(path + "/rootfs/unikernel/")
+		bin, err := urunc.FindExecutable()
 		if err == nil {
-
-			if len(files) != 1 {
-				return errors.New("urunc/exec: multiple files found at /rootfs/unikernel/ dir")
-			}
-
-			unikernelFile := files[0].Name()
-			unikernelFile = path + "/rootfs/unikernel/" + unikernelFile
-			shimLog.WithField("src", "uruncio").WithField("unikernelFile", unikernelFile).Error("pkg/start.go/startContainer")
-
-			unikernelPid := urunc.Command(unikernelFile)
-			shimLog.WithField("src", "uruncio").WithField("unikernelPid", unikernelPid).Error("pkg/start.go/startContainer")
-
-		} else {
-			shimLog.WithField("src", "uruncio").WithField("unikernelFile", "unikernel file not found in rootfs").Error("pkg/start.go/startContainer")
+			unikernelFound = true
+			unikernelBin = bin
 		}
-		// I am not sure if we need any information provided by the config.json at this step
 	}
 
-	if c.cType.IsSandbox() {
+	var cmd *osexec.Cmd
+	cmdFound := false
+
+	// if unikernel found, create a cmd
+	if c.cType.IsSandbox() && unikernelFound {
+		shimLog.WithField("src", "uruncio").WithField("unikernelBin", unikernelBin).Error("pkg/start.go/startContainer")
+		cmd = osexec.Command(unikernelBin)
+		cmdFound = true
+		shimLog.WithField("src", "uruncio").WithField("cmd", cmd.Path).Error("pkg/start.go/startContainer")
+
+		// err := s.sandbox.Start(ctx)
+		// if err != nil {
+		// 	return err
+		// }
+		// // Start monitor after starting sandbox
+		// s.monitor, err = s.sandbox.Monitor(ctx)
+		// if err != nil {
+		// 	return err
+		// }
+		// go watchSandbox(ctx, s)
+
+		// // We use s.ctx(`ctx` derived from `s.ctx`) to check for cancellation of the
+		// // shim context and the context passed to startContainer for tracing.
+		// go watchOOMEvents(ctx, s)
+	} else if c.cType.IsSandbox() {
 		err := s.sandbox.Start(ctx)
 		if err != nil {
 			return err
@@ -128,25 +111,52 @@ func startContainer(ctx context.Context, s *service, c *container) (retErr error
 		// https://github.com/opencontainers/runtime-spec/blob/master/runtime.md#lifecycle
 		shimLog.WithError(err).Warn("Failed to run post-start hooks")
 	}
+	// normaly c.status is CREATED
+	shimLog.WithField("src", "uruncio").WithField("c.status", c.status).Error("pkg/start.go/startContainer")
 
 	c.status = task.StatusRunning
 
+	// normaly c.status is RUNNING
+	shimLog.WithField("src", "uruncio").WithField("c.status", c.status).Error("pkg/start.go/startContainer")
+	shimLog.WithField("src", "uruncio").WithField("cmdFound", cmdFound).Error("pkg/start.go/startContainer")
+
+	if cmdFound {
+		shimLog.WithField("src", "uruncio").WithField("cmd", cmd.Path).Error("pkg/start.go/startContainer")
+		return errors.New("urunc/exec: exec not implemented yet")
+	}
+	shimLog.WithField("src", "uruncio").WithField("msg", "no cmd was found").Error("pkg/start.go/startContainer")
+
 	stdin, stdout, stderr, err := s.sandbox.IOStream(c.id, c.id)
+
+	shimLog.WithField("src", "uruncio").WithField("msg", "got io pipes").Error("pkg/start.go/startContainer")
+
 	if err != nil {
 		return err
 	}
 
 	c.stdinPipe = stdin
 
+	shimLog.WithField("src", "uruncio").WithField("msg", "redirected stdin pipe").Error("pkg/start.go/startContainer")
+
 	if c.stdin != "" || c.stdout != "" || c.stderr != "" {
+		shimLog.WithField("src", "uruncio").WithField("msg", "new tty will be created").Error("pkg/start.go/startContainer")
+
 		tty, err := newTtyIO(ctx, c.stdin, c.stdout, c.stderr, c.terminal)
+		shimLog.WithField("src", "uruncio").WithField("msg", "new tty created").Error("pkg/start.go/startContainer")
+
 		if err != nil {
 			return err
 		}
+
+		shimLog.WithField("src", "uruncio").WithField("msg", "tty will be set").Error("pkg/start.go/startContainer")
+
 		c.ttyio = tty
+		shimLog.WithField("src", "uruncio").WithField("msg", "tty set").Error("pkg/start.go/startContainer")
 
 		go ioCopy(shimLog.WithField("container", c.id), c.exitIOch, c.stdinCloser, tty, stdin, stdout, stderr)
 	} else {
+		shimLog.WithField("src", "uruncio").WithField("msg", "closing channels").Error("pkg/start.go/startContainer")
+
 		// close the io exit channel, since there is no io for this container,
 		// otherwise the following wait goroutine will hang on this channel.
 		close(c.exitIOch)
@@ -154,8 +164,10 @@ func startContainer(ctx context.Context, s *service, c *container) (retErr error
 		// io.
 		close(c.stdinCloser)
 	}
+	shimLog.WithField("src", "uruncio").WithField("msg", "before go wait").Error("pkg/start.go/startContainer")
 
 	go wait(ctx, s, c, "")
+	shimLog.WithField("src", "uruncio").WithField("msg", "after go wait").Error("pkg/start.go/startContainer")
 
 	return nil
 }

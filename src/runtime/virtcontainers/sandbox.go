@@ -1637,40 +1637,51 @@ func (s *Sandbox) createContainers(ctx context.Context) error {
 // Start starts a sandbox. The containers that are making the sandbox
 // will be started.
 func (s *Sandbox) Start(ctx context.Context) error {
-	if err := s.state.ValidTransition(s.state.State, types.StateRunning); err != nil {
-		return err
-	}
-	unikernel := s.hypervisor.HypervisorConfig().Unikernel
-	s.Logger().WithField("src", "uruncio").WithField("unikernel", unikernel).Error("virtcontainers/sandbox.go/Start")
 
-	prevState := s.state.State
-
-	if err := s.setSandboxState(types.StateRunning); err != nil {
-		return err
-	}
-
-	var startErr error
-	defer func() {
-		if startErr != nil {
-			s.setSandboxState(prevState)
+	if s.hypervisor.HypervisorConfig().Unikernel {
+		s.Logger().WithField("src", "uruncio").WithField("unikernel", true).Error("virtcontainers/sandbox.go/Start")
+		if err := s.setSandboxState(types.StateRunning); err != nil {
+			return err
 		}
-	}()
-	for _, c := range s.containers {
-		if startErr = c.start(ctx); startErr != nil {
-			return startErr
+		if err := s.storeSandbox(ctx); err != nil {
+			return err
+		}
+
+	} else {
+		if err := s.state.ValidTransition(s.state.State, types.StateRunning); err != nil {
+			return err
+		}
+		prevState := s.state.State
+
+		if err := s.setSandboxState(types.StateRunning); err != nil {
+			return err
+		}
+
+		var startErr error
+		defer func() {
+			if startErr != nil {
+				s.setSandboxState(prevState)
+			}
+		}()
+		for _, c := range s.containers {
+			if startErr = c.start(ctx); startErr != nil {
+				return startErr
+			}
+		}
+
+		if err := s.storeSandbox(ctx); err != nil {
+			return err
 		}
 	}
+	// unikernel := s.hypervisor.HypervisorConfig().Unikernel
+	// s.Logger().WithField("src", "uruncio").WithField("unikernel", unikernel).Error("virtcontainers/sandbox.go/Start")
 
-	if err := s.storeSandbox(ctx); err != nil {
-		return err
-	}
-
-	s.Logger().Info("Sandbox is started")
+	// s.Logger().Info("Sandbox is started")
 	s.Logger().WithField("src", "uruncio").Error("virtcontainers/sandbox.go/sandbox.Start")
-	s.Logger().WithField("src", "uruncio").WithField("sandboxID", s.ID()).Error("virtcontainers/sandbox.go/sandbox.Start")
-	s.Logger().WithField("src", "uruncio").WithField("unikernel", s.hypervisor.HypervisorConfig().Unikernel).Error("virtcontainers/sandbox.go/sandbox.Start")
-
+	// s.Logger().WithField("src", "uruncio").WithField("sandboxID", s.ID()).Error("virtcontainers/sandbox.go/sandbox.Start")
+	// s.Logger().WithField("src", "uruncio").WithField("unikernel", s.hypervisor.HypervisorConfig().Unikernel).Error("virtcontainers/sandbox.go/sandbox.Start")
 	return nil
+
 }
 
 // Stop stops a sandbox. The containers that are making the sandbox
