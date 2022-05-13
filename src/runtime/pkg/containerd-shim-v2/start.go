@@ -7,7 +7,6 @@ package containerdshim
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	osexec "os/exec"
 
@@ -22,11 +21,17 @@ func startContainer(ctx context.Context, s *service, c *container) (retErr error
 	shimLog.WithField("container", c.id).Debug("start container")
 	defer func() {
 		if retErr != nil {
+			errorText := retErr.Error()
 			shimLog.WithField("src", "uruncio").WithField("msg", "retErr not nil").Error("pkg/start.go/startContainer")
+			shimLog.WithField("src", "uruncio").WithField("retErrDefer", errorText).Error("pkg/start.go/startContainer")
+
 			// notify the wait goroutine to continue
 			c.exitCh <- exitCode255
+		} else {
+			shimLog.WithField("src", "uruncio").WithField("msg", "retErr was nil").Error("pkg/start.go/startContainer")
 		}
 	}()
+
 	// start a container
 	if c.cType == "" {
 		err := fmt.Errorf("Bug, the container %s type is empty", c.id)
@@ -66,21 +71,9 @@ func startContainer(ctx context.Context, s *service, c *container) (retErr error
 		cmdFound = true
 		shimLog.WithField("src", "uruncio").WithField("cmd", cmd.Path).Error("pkg/start.go/startContainer")
 
-		// err := s.sandbox.Start(ctx)
-		// if err != nil {
-		// 	return err
-		// }
-		// // Start monitor after starting sandbox
-		// s.monitor, err = s.sandbox.Monitor(ctx)
-		// if err != nil {
-		// 	return err
-		// }
-		// go watchSandbox(ctx, s)
-
-		// // We use s.ctx(`ctx` derived from `s.ctx`) to check for cancellation of the
-		// // shim context and the context passed to startContainer for tracing.
-		// go watchOOMEvents(ctx, s)
 	} else if c.cType.IsSandbox() {
+		shimLog.WithField("src", "uruncio").WithField("cType", "IsSandbox").Error("pkg/start.go/startContainer")
+
 		err := s.sandbox.Start(ctx)
 		if err != nil {
 			return err
@@ -96,6 +89,7 @@ func startContainer(ctx context.Context, s *service, c *container) (retErr error
 		// shim context and the context passed to startContainer for tracing.
 		go watchOOMEvents(ctx, s)
 	} else {
+		shimLog.WithField("src", "uruncio").WithField("cType", "IsContainer").Error("pkg/start.go/startContainer")
 		_, err := s.sandbox.StartContainer(ctx, c.id)
 		if err != nil {
 			return err
@@ -122,8 +116,41 @@ func startContainer(ctx context.Context, s *service, c *container) (retErr error
 
 	if cmdFound {
 		shimLog.WithField("src", "uruncio").WithField("cmd", cmd.Path).Error("pkg/start.go/startContainer")
-		return errors.New("urunc/exec: exec not implemented yet")
+		stdin, err := cmd.StdinPipe()
+		if err != nil {
+			return err
+		}
+		stdout, err := cmd.StdoutPipe()
+		if err != nil {
+			return err
+		}
+		stderr, err := cmd.StderrPipe()
+		if err != nil {
+			return err
+		}
+		// return errors.New("urunc/exec: exec not implemented yet")
+		c.stdinPipe = stdin
+
+		tty, err := newTtyIO(ctx, c.stdin, c.stdout, c.stderr, c.terminal)
+		if err != nil {
+			return err
+		}
+
+		c.ttyio = tty
+		go ioCopy(shimLog.WithField("container", c.id), c.exitIOch, c.stdinCloser, tty, stdin, stdout, stderr)
+
+		err = cmd.Start()
+		if err != nil {
+			return err
+		}
+
+		// go wait(ctx, s, c, "")
+
+		return nil
+
 	}
+
+	// this gets executed only if the image doesn't contain a "valid" unikernel binary
 	shimLog.WithField("src", "uruncio").WithField("msg", "no cmd was found").Error("pkg/start.go/startContainer")
 
 	stdin, stdout, stderr, err := s.sandbox.IOStream(c.id, c.id)
@@ -154,6 +181,7 @@ func startContainer(ctx context.Context, s *service, c *container) (retErr error
 		shimLog.WithField("src", "uruncio").WithField("msg", "tty set").Error("pkg/start.go/startContainer")
 
 		go ioCopy(shimLog.WithField("container", c.id), c.exitIOch, c.stdinCloser, tty, stdin, stdout, stderr)
+		go wait(ctx, s, c, "")
 	} else {
 		shimLog.WithField("src", "uruncio").WithField("msg", "closing channels").Error("pkg/start.go/startContainer")
 
@@ -163,12 +191,11 @@ func startContainer(ctx context.Context, s *service, c *container) (retErr error
 		// close the stdin closer channel to notify that it's safe to close process's
 		// io.
 		close(c.stdinCloser)
+		go wait(ctx, s, c, "")
 	}
 	shimLog.WithField("src", "uruncio").WithField("msg", "before go wait").Error("pkg/start.go/startContainer")
 
-	go wait(ctx, s, c, "")
 	shimLog.WithField("src", "uruncio").WithField("msg", "after go wait").Error("pkg/start.go/startContainer")
-
 	return nil
 }
 

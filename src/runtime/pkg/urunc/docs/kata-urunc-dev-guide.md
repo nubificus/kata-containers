@@ -111,6 +111,25 @@ sudo ctr run --runtime io.containerd.run.kata.v2 -t --rm docker.io/library/ubunt
 sudo ctr run --runtime io.containerd.run.kata-urunc.v2 -t --rm docker.io/urunc/testhello:latest urunc-kata-test /unikernel/hello
 ```
 
+
+### Clean up
+
+```bash
+sudo pkill -f ubuntu-kata-test ;\
+  sudo ctr c rm ubuntu-kata-test ;\
+  sudo ctr snapshot rm ubuntu-kata-test ;\
+  sudo systemctl restart containerd ;\
+  sudo rm -rf /run/containerd/io.containerd.runtime.v2.task/default/ubuntu-kata-test
+```
+
+```bash
+sudo pkill -f urunc-kata-test ;\
+  sudo ctr c rm urunc-kata-test ;\
+  sudo ctr snapshot rm urunc-kata-test ;\
+  sudo systemctl restart containerd ;\
+  sudo rm -rf /run/containerd/io.containerd.runtime.v2.task/default/urunc-kata-test
+```
+
 ## Clean up dead containers
 
 During this whole process many things fail, so it often is required to clean up the dead containers:
@@ -139,22 +158,4 @@ cd nubificus/kata-containers/src/runtime/pkg/urunc/image-builder
 # Create a urunc/testhello image containing a hello
 # import it to ctr and keep the budnle .tar file
 ./build.sh -u hello -i urunc/testhello
-```
-
-### Clean up
-
-```bash
-sudo pkill -f ubuntu-kata-test ;\
-  sudo ctr c rm ubuntu-kata-test ;\
-  sudo ctr snapshot rm ubuntu-kata-test ;\
-  sudo systemctl restart containerd ;\
-  sudo rm -rf /run/containerd/io.containerd.runtime.v2.task/default/ubuntu-kata-test ;\
-```
-
-```bash
-sudo pkill -f urunc-kata-test ;\
-  sudo ctr c rm urunc-kata-test ;\
-  sudo ctr snapshot rm urunc-kata-test ;\
-  sudo systemctl restart containerd ;\
-  sudo rm -rf /run/containerd/io.containerd.runtime.v2.task/default/urunc-kata-test ;\
 ```
