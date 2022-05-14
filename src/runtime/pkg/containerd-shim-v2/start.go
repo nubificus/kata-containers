@@ -8,6 +8,7 @@ package containerdshim
 import (
 	"context"
 	"fmt"
+	"io"
 	osexec "os/exec"
 
 	"github.com/sirupsen/logrus"
@@ -116,20 +117,14 @@ func startContainer(ctx context.Context, s *service, c *container) (retErr error
 
 	if cmdFound {
 		shimLog.WithField("src", "uruncio").WithField("cmd", cmd.Path).Error("pkg/start.go/startContainer")
-		stdin, err := cmd.StdinPipe()
-		if err != nil {
-			return err
-		}
-		stdout, err := cmd.StdoutPipe()
-		if err != nil {
-			return err
-		}
-		stderr, err := cmd.StderrPipe()
-		if err != nil {
-			return err
-		}
-		// return errors.New("urunc/exec: exec not implemented yet")
-		c.stdinPipe = stdin
+
+		cmdStdinReader, cmdStdinWriter := io.Pipe()
+		cmdStdoutReader, cmdStdoutWriter := io.Pipe()
+		cmdStderrReader, cmdStderrWriter := io.Pipe()
+
+		cmd.Stdin = cmdStdinReader
+		cmd.Stdout = cmdStdoutWriter
+		cmd.Stderr = cmdStderrWriter
 
 		tty, err := newTtyIO(ctx, c.stdin, c.stdout, c.stderr, c.terminal)
 		if err != nil {
@@ -137,14 +132,23 @@ func startContainer(ctx context.Context, s *service, c *container) (retErr error
 		}
 
 		c.ttyio = tty
-		go ioCopy(shimLog.WithField("container", c.id), c.exitIOch, c.stdinCloser, tty, stdin, stdout, stderr)
+		go ioCopy(shimLog.WithField("container", c.id).WithField("src", "uruncio"), c.exitIOch, c.stdinCloser, tty, cmdStdinWriter, cmdStdoutReader, cmdStderrReader)
 
 		err = cmd.Start()
+		pid := cmd.Process.Pid
+		shimLog.WithField("src", "uruncio").WithField("process pid", pid).Error("pkg/start.go/startContainer")
+		s.pid = uint32(pid)
+		s.hpid = uint32(pid)
+
+		// defer func() {
+		// 	go cmd.Wait()
+		// }()
+
 		if err != nil {
 			return err
 		}
 
-		// go wait(ctx, s, c, "")
+		go wait(ctx, s, c, "")
 
 		return nil
 
