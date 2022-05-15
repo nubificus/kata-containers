@@ -47,6 +47,9 @@ const (
 	// ClhHypervisor is the ICH hypervisor.
 	ClhHypervisor HypervisorType = "clh"
 
+	// UnikernelHypervisor is the Unikernel hypervisor.
+	UnikernelHypervisor HypervisorType = "unikernel"
+
 	// MockHypervisor is a mock hypervisor for testing purposes
 	MockHypervisor HypervisorType = "mock"
 
@@ -165,6 +168,9 @@ func (hType *HypervisorType) Set(value string) error {
 	case "firecracker":
 		*hType = FirecrackerHypervisor
 		return nil
+	case "unikernel":
+		*hType = UnikernelHypervisor
+		return nil
 	case "acrn":
 		*hType = AcrnHypervisor
 		return nil
@@ -186,6 +192,8 @@ func (hType *HypervisorType) String() string {
 		return string(QemuHypervisor)
 	case FirecrackerHypervisor:
 		return string(FirecrackerHypervisor)
+	case UnikernelHypervisor:
+		return string(UnikernelHypervisor)
 	case AcrnHypervisor:
 		return string(AcrnHypervisor)
 	case ClhHypervisor:
@@ -537,6 +545,8 @@ type HypervisorConfig struct {
 
 	// Disable selinux from the hypervisor process
 	DisableSeLinux bool
+
+	Unikernel bool
 }
 
 // vcpu mapping from vcpu number to thread number

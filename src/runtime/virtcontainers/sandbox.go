@@ -1215,7 +1215,12 @@ func (s *Sandbox) startVM(ctx context.Context) (err error) {
 			return vm.assignSandbox(s)
 		}
 
-		return s.hypervisor.StartVM(ctx, VmStartTimeout)
+
+		if s.config.HypervisorConfig.Unikernel == false {
+			return s.hypervisor.StartVM(ctx, VmStartTimeout)
+		} else {
+			return nil
+		}
 	}); err != nil {
 		return err
 	}
@@ -1228,7 +1233,7 @@ func (s *Sandbox) startVM(ctx context.Context) (err error) {
 		}
 	}
 
-	s.Logger().Info("VM started")
+	s.Logger().Error("VM started")
 
 	if s.cw != nil {
 		s.Logger().Debug("console watcher starts")
@@ -1238,23 +1243,29 @@ func (s *Sandbox) startVM(ctx context.Context) (err error) {
 		}
 	}
 
+	s.Logger().WithField("unikernel", s.config.HypervisorConfig.Unikernel).Error("Unikernel?")
+	if s.config.HypervisorConfig.Unikernel != true {
 	// Once the hypervisor is done starting the sandbox,
 	// we want to guarantee that it is manageable.
 	// For that we need to ask the agent to start the
 	// sandbox inside the VM.
-	if err := s.agent.startSandbox(ctx, s); err != nil {
-		return err
+		if err := s.agent.startSandbox(ctx, s); err != nil {
+			return err
+		}
+		defer func() {
+			if err != nil {
+				if e := s.agent.stopSandbox(ctx, s); e != nil {
+					s.Logger().WithError(e).WithField("sandboxid", s.id).Warning("Agent did not stop sandbox")
+				}
+			}
+		}()
+
+	} else {
+		s.Logger().WithField("inelse", err).Error("err?")
 	}
 
-	s.Logger().Info("Agent started in the sandbox")
+	s.Logger().Error("Agent started in the sandbox")
 
-	defer func() {
-		if err != nil {
-			if e := s.agent.stopSandbox(ctx, s); e != nil {
-				s.Logger().WithError(e).WithField("sandboxid", s.id).Warning("Agent did not stop sandbox")
-			}
-		}
-	}()
 
 	return nil
 }
@@ -1357,6 +1368,7 @@ func (s *Sandbox) StartContainer(ctx context.Context, containerID string) (VCCon
 		return nil, err
 	}
 
+	s.Logger().WithField("container", containerID).Error("Will start container")
 	// Start it.
 	if err = c.start(ctx); err != nil {
 		return nil, err
@@ -1598,19 +1610,23 @@ func (s *Sandbox) createContainers(ctx context.Context) error {
 	span, ctx := katatrace.Trace(ctx, s.Logger(), "createContainers", sandboxTracingTags, map[string]string{"sandbox_id": s.id})
 	defer span.End()
 
+	s.Logger().Error("Starting container creation")
 	for i := range s.config.Containers {
 
 		c, err := newContainer(ctx, s, &s.config.Containers[i])
 		if err != nil {
 			return err
 		}
+		s.Logger().Error("after new creation")
 		if err := c.create(ctx); err != nil {
 			return err
 		}
 
+		s.Logger().Error("after create")
 		if err := s.addContainer(c); err != nil {
 			return err
 		}
+		s.Logger().Error("after add")
 	}
 
 	// Update resources after having added containers to the sandbox, since
@@ -1619,12 +1635,15 @@ func (s *Sandbox) createContainers(ctx context.Context) error {
 		return err
 	}
 
-	if err := s.resourceControllerUpdate(ctx); err != nil {
+	s.Logger().Error("after update")
+	/*if err := s.resourceControllerUpdate(ctx); err != nil {
 		return err
-	}
+	}*/
+	s.Logger().Error("after resource controller")
 	if err := s.storeSandbox(ctx); err != nil {
 		return err
 	}
+	s.Logger().Error("after store")
 
 	return nil
 }
@@ -2126,11 +2145,13 @@ func (s *Sandbox) resourceControllerUpdate(ctx context.Context) error {
 		return err
 	}
 
+	s.Logger().Error("after getsandbox")
 	// We update the sandbox controller with potentially new virtual CPUs.
 	if err := s.sandboxController.UpdateCpuSet(cpuset, memset); err != nil {
 		return err
 	}
 
+	s.Logger().Error("after updatecpuset")
 	if s.overheadController != nil {
 		// If we have an overhead controller, new vCPU threads would start there,
 		// as being children of the VMM PID.
@@ -2140,6 +2161,7 @@ func (s *Sandbox) resourceControllerUpdate(ctx context.Context) error {
 		}
 	}
 
+	s.Logger().Error("after final")
 	return nil
 }
 

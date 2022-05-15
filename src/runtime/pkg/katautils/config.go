@@ -48,6 +48,7 @@ const (
 	clhHypervisorTableType         = "clh"
 	qemuHypervisorTableType        = "qemu"
 	acrnHypervisorTableType        = "acrn"
+	unikernelHypervisorTableType        = "unikernel"
 
 	// the maximum amount of PCI bridges that can be cold plugged in a VM
 	maxPCIBridges uint32 = 5
@@ -146,6 +147,7 @@ type hypervisor struct {
 	Rootless                       bool     `toml:"rootless"`
 	DisableSeccomp                 bool     `toml:"disable_seccomp"`
 	DisableSeLinux                 bool     `toml:"disable_selinux"`
+	Unikernel                      bool     `toml:"unikernel"` // Unikernel flag
 }
 
 type runtime struct {
@@ -583,6 +585,74 @@ func (a agent) kernelModules() []string {
 	return a.KernelModules
 }
 
+func newUnikernelHypervisorConfig(h hypervisor) (vc.HypervisorConfig, error) {
+	hypervisor, err := h.path()
+	if err != nil {
+		return vc.HypervisorConfig{}, err
+	}
+
+	jailer, err := h.jailerPath()
+	if err != nil {
+		return vc.HypervisorConfig{}, err
+	}
+
+	kernel, err := h.kernel()
+	if err != nil {
+		return vc.HypervisorConfig{}, err
+	}
+
+	initrd, image, err := h.getInitrdAndImage()
+	if err != nil {
+		return vc.HypervisorConfig{}, err
+	}
+
+	firmware, err := h.firmware()
+	if err != nil {
+		return vc.HypervisorConfig{}, err
+	}
+
+	kernelParams := h.kernelParams()
+
+	blockDriver, err := h.blockDeviceDriver()
+	if err != nil {
+		return vc.HypervisorConfig{}, err
+	}
+
+	rxRateLimiterMaxRate := h.getRxRateLimiterCfg()
+	txRateLimiterMaxRate := h.getTxRateLimiterCfg()
+
+	return vc.HypervisorConfig{
+		HypervisorPath:        hypervisor,
+		HypervisorPathList:    h.HypervisorPathList,
+		JailerPath:            jailer,
+		JailerPathList:        h.JailerPathList,
+		KernelPath:            kernel,
+		InitrdPath:            initrd,
+		ImagePath:             image,
+		FirmwarePath:          firmware,
+		KernelParams:          vc.DeserializeParams(strings.Fields(kernelParams)),
+		NumVCPUs:              h.defaultVCPUs(),
+		DefaultMaxVCPUs:       h.defaultMaxVCPUs(),
+		MemorySize:            h.defaultMemSz(),
+		MemSlots:              h.defaultMemSlots(),
+		EntropySource:         h.GetEntropySource(),
+		EntropySourceList:     h.EntropySourceList,
+		DefaultBridges:        h.defaultBridges(),
+		DisableBlockDeviceUse: false, // shared fs is not supported in Firecracker,
+		HugePages:             h.HugePages,
+		Debug:                 h.Debug,
+		DisableNestingChecks:  h.DisableNestingChecks,
+		BlockDeviceDriver:     blockDriver,
+		EnableIOThreads:       h.EnableIOThreads,
+		DisableVhostNet:       true, // vhost-net backend is not supported in Firecracker
+		GuestHookPath:         h.guestHookPath(),
+		RxRateLimiterMaxRate:  rxRateLimiterMaxRate,
+		TxRateLimiterMaxRate:  txRateLimiterMaxRate,
+		EnableAnnotations:     h.EnableAnnotations,
+		Unikernel:	       h.Unikernel,
+	}, nil
+}
+
 func newFirecrackerHypervisorConfig(h hypervisor) (vc.HypervisorConfig, error) {
 	hypervisor, err := h.path()
 	if err != nil {
@@ -973,6 +1043,9 @@ func updateRuntimeConfigHypervisor(configPath string, tomlConf tomlConfig, confi
 		case firecrackerHypervisorTableType:
 			config.HypervisorType = vc.FirecrackerHypervisor
 			hConfig, err = newFirecrackerHypervisorConfig(hypervisor)
+		case unikernelHypervisorTableType:
+			config.HypervisorType = vc.UnikernelHypervisor
+			hConfig, err = newUnikernelHypervisorConfig(hypervisor)
 		case qemuHypervisorTableType:
 			config.HypervisorType = vc.QemuHypervisor
 			hConfig, err = newQemuHypervisorConfig(hypervisor)

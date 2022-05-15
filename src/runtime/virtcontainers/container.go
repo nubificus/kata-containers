@@ -881,14 +881,21 @@ func (c *Container) create(ctx context.Context) (err error) {
 	// inside the VM
 	c.getSystemMountInfo()
 
-	process, err := c.sandbox.agent.createContainer(ctx, c.sandbox, c)
-	if err != nil {
-		return err
-	}
-	c.process = *process
+	if c.sandbox.config.HypervisorConfig.Unikernel != true {
+		process, err := c.sandbox.agent.createContainer(ctx, c.sandbox, c)
+		if err != nil {
+			return err
+		}
+		c.process = *process
 
-	if err = c.setContainerState(types.StateReady); err != nil {
-		return
+		if err = c.setContainerState(types.StateReady); err != nil {
+			return err
+		}
+	} else {
+
+		if err = c.setContainerState(types.StateReady); err != nil {
+			return err
+		}
 	}
 
 	return nil
@@ -943,6 +950,7 @@ func (c *Container) start(ctx context.Context) error {
 		return err
 	}
 
+	c.Logger().Error("START!")
 	if c.state.State != types.StateReady &&
 		c.state.State != types.StateStopped {
 		return fmt.Errorf("Container not ready or stopped, impossible to start")
@@ -952,13 +960,18 @@ func (c *Container) start(ctx context.Context) error {
 		return err
 	}
 
-	if err := c.sandbox.agent.startContainer(ctx, c.sandbox, c); err != nil {
-		c.Logger().WithError(err).Error("Failed to start container")
+	if c.sandbox.config.HypervisorConfig.Unikernel != true{
+		if err := c.sandbox.agent.startContainer(ctx, c.sandbox, c); err != nil {
+			c.Logger().WithError(err).Error("Failed to start container")
 
-		if err := c.stop(ctx, true); err != nil {
-			c.Logger().WithError(err).Warn("Failed to stop container")
+			if err := c.stop(ctx, true); err != nil {
+				c.Logger().WithError(err).Warn("Failed to stop container")
+			}
+			return err
 		}
-		return err
+	} else {
+		/* Do what you have to do to start the container without the agent! */
+		c.Logger().Error("This is where the container will be started without the agent!")
 	}
 
 	return c.setContainerState(types.StateRunning)

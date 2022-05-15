@@ -99,12 +99,17 @@ func createSandboxFromConfig(ctx context.Context, sandboxConfig SandboxConfig, f
 		}
 	}()
 
+	s.Logger().Error("Before Network Create")
 	s.postCreatedNetwork(ctx)
 
-	if err = s.getAndStoreGuestDetails(ctx); err != nil {
-		return nil, err
+	s.Logger().Error("After Network Create")
+	if s.config.HypervisorConfig.Unikernel != true {
+		if err = s.getAndStoreGuestDetails(ctx); err != nil {
+			return nil, err
+		}
 	}
 
+	s.Logger().Error("Before Container Create")
 	// Create Containers
 	if err = s.createContainers(ctx); err != nil {
 		return nil, err

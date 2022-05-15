@@ -33,6 +33,8 @@ func NewHypervisor(hType HypervisorType) (Hypervisor, error) {
 		return &qemu{}, nil
 	case FirecrackerHypervisor:
 		return &firecracker{}, nil
+	case UnikernelHypervisor:
+		return &unikernel{}, nil
 	case AcrnHypervisor:
 		return &Acrn{}, nil
 	case ClhHypervisor:

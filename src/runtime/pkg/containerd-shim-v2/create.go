@@ -150,8 +150,11 @@ func create(ctx context.Context, s *service, r *taskAPI.CreateTaskRequest) (*con
 		}
 		s.sandbox = sandbox
 		pid, err := s.sandbox.GetHypervisorPid()
-		if err != nil {
-			return nil, err
+
+		if s.config.HypervisorConfig.Unikernel != true {
+			if err != nil {
+				return nil, err
+			}
 		}
 		s.hpid = uint32(pid)
 
