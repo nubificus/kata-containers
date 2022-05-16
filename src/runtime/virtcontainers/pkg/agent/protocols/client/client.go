@@ -35,6 +35,7 @@ const (
 	VSockSocketScheme     = "vsock"
 	HybridVSockScheme     = "hvsock"
 	MockHybridVSockScheme = "mock"
+	UruncSockScheme       = ""
 )
 
 var defaultDialTimeout = 30 * time.Second
@@ -241,6 +242,8 @@ func parse(sock string) (string, *url.URL, error) {
 			return "", nil, grpcStatus.Errorf(codes.InvalidArgument, "Invalid mock hybrid vsock scheme: %s", sock)
 		}
 		// e.g. mock:/tmp/socket
+		grpcAddr = MockHybridVSockScheme + ":" + addr.Path
+	case UruncSockScheme:
 		grpcAddr = MockHybridVSockScheme + ":" + addr.Path
 	default:
 		return "", nil, grpcStatus.Errorf(codes.InvalidArgument, "Invalid scheme: %s", sock)

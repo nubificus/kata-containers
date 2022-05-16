@@ -149,10 +149,10 @@ func create(ctx context.Context, s *service, r *taskAPI.CreateTaskRequest) (*con
 			return nil, err
 		}
 		s.sandbox = sandbox
-		pid, err := s.sandbox.GetHypervisorPid()
-		if err != nil {
-			return nil, err
-		}
+		pid, _ := s.sandbox.GetHypervisorPid()
+		// if err != nil {
+		// 	return nil, err
+		// }
 		s.hpid = uint32(pid)
 
 		if defaultStartManagementServerFunc != nil {

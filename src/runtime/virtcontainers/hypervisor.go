@@ -50,6 +50,9 @@ const (
 	// MockHypervisor is a mock hypervisor for testing purposes
 	MockHypervisor HypervisorType = "mock"
 
+	// UruncHypervisor is a dummy hypervisor for running unikernels
+	UruncHypervisor HypervisorType = "urunc"
+
 	procMemInfo = "/proc/meminfo"
 	procCPUInfo = "/proc/cpuinfo"
 
@@ -174,6 +177,9 @@ func (hType *HypervisorType) Set(value string) error {
 	case "mock":
 		*hType = MockHypervisor
 		return nil
+	case "urunc":
+		*hType = UruncHypervisor
+		return nil
 	default:
 		return fmt.Errorf("Unknown hypervisor type %s", value)
 	}
@@ -192,6 +198,8 @@ func (hType *HypervisorType) String() string {
 		return string(ClhHypervisor)
 	case MockHypervisor:
 		return string(MockHypervisor)
+	case UruncHypervisor:
+		return string(UruncHypervisor)
 	default:
 		return ""
 	}
@@ -501,6 +509,9 @@ type HypervisorConfig struct {
 
 	// Disable selinux from the hypervisor process
 	DisableSeLinux bool
+
+	// Unikernel used to indicate that the bundle contains unikernel
+	Unikernel bool
 }
 
 // vcpu mapping from vcpu number to thread number

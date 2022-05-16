@@ -21,6 +21,8 @@ const (
 	// UnknownContainerType specifies a container that provides container type annotation, but
 	// it is unknown.
 	UnknownContainerType ContainerType = "unknown_container_type"
+	// UnikernelContainer type
+	UnikernelContainer ContainerType = "unikernel_container_type"
 )
 
 // IsSandbox determines if the container type can be considered as a sandbox.
@@ -36,4 +38,8 @@ func (t ContainerType) IsCriSandbox() bool {
 // "Regular" Container
 func (t ContainerType) IsSingleContainer() bool {
 	return t == SingleContainer
+}
+
+func (t ContainerType) IsUnikernelContainer() bool {
+	return t == UnikernelContainer
 }

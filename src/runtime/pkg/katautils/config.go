@@ -48,6 +48,7 @@ const (
 	clhHypervisorTableType         = "clh"
 	qemuHypervisorTableType        = "qemu"
 	acrnHypervisorTableType        = "acrn"
+	uruncHypervisorTableType       = "urunc"
 
 	// the maximum amount of PCI bridges that can be cold plugged in a VM
 	maxPCIBridges uint32 = 5
@@ -138,6 +139,7 @@ type hypervisor struct {
 	Rootless                bool     `toml:"rootless"`
 	DisableSeccomp          bool     `toml:"disable_seccomp"`
 	DisableSeLinux          bool     `toml:"disable_selinux"`
+	Unikernel               bool     `toml:"unikernel"`
 }
 
 type runtime struct {
@@ -497,6 +499,10 @@ func (h hypervisor) getIOMMUPlatform() bool {
 		kataUtilsLogger.Info("IOMMUPlatform is disabled by default.")
 	}
 	return h.IOMMUPlatform
+}
+
+func (h hypervisor) getUnikernel() bool {
+	return h.Unikernel
 }
 
 func (a agent) debugConsoleEnabled() bool {
@@ -877,6 +883,74 @@ func newClhHypervisorConfig(h hypervisor) (vc.HypervisorConfig, error) {
 	}, nil
 }
 
+func newUruncHypervisorConfig(h hypervisor) (vc.HypervisorConfig, error) {
+	hypervisor, err := h.path()
+	if err != nil {
+		return vc.HypervisorConfig{}, err
+	}
+
+	jailer, err := h.jailerPath()
+	if err != nil {
+		return vc.HypervisorConfig{}, err
+	}
+
+	kernel, err := h.kernel()
+	if err != nil {
+		return vc.HypervisorConfig{}, err
+	}
+
+	initrd, image, err := h.getInitrdAndImage()
+	if err != nil {
+		return vc.HypervisorConfig{}, err
+	}
+
+	firmware, err := h.firmware()
+	if err != nil {
+		return vc.HypervisorConfig{}, err
+	}
+
+	kernelParams := h.kernelParams()
+
+	blockDriver, err := h.blockDeviceDriver()
+	if err != nil {
+		return vc.HypervisorConfig{}, err
+	}
+
+	rxRateLimiterMaxRate := h.getRxRateLimiterCfg()
+	txRateLimiterMaxRate := h.getTxRateLimiterCfg()
+
+	return vc.HypervisorConfig{
+		HypervisorPath:        hypervisor,
+		HypervisorPathList:    h.HypervisorPathList,
+		JailerPath:            jailer,
+		JailerPathList:        h.JailerPathList,
+		KernelPath:            kernel,
+		InitrdPath:            initrd,
+		ImagePath:             image,
+		FirmwarePath:          firmware,
+		KernelParams:          vc.DeserializeParams(strings.Fields(kernelParams)),
+		NumVCPUs:              h.defaultVCPUs(),
+		DefaultMaxVCPUs:       h.defaultMaxVCPUs(),
+		MemorySize:            h.defaultMemSz(),
+		MemSlots:              h.defaultMemSlots(),
+		EntropySource:         h.GetEntropySource(),
+		EntropySourceList:     h.EntropySourceList,
+		DefaultBridges:        h.defaultBridges(),
+		DisableBlockDeviceUse: false, // shared fs is not supported in Firecracker,
+		HugePages:             h.HugePages,
+		Debug:                 h.Debug,
+		DisableNestingChecks:  h.DisableNestingChecks,
+		BlockDeviceDriver:     blockDriver,
+		EnableIOThreads:       h.EnableIOThreads,
+		DisableVhostNet:       true, // vhost-net backend is not supported in Firecracker
+		GuestHookPath:         h.guestHookPath(),
+		RxRateLimiterMaxRate:  rxRateLimiterMaxRate,
+		TxRateLimiterMaxRate:  txRateLimiterMaxRate,
+		EnableAnnotations:     h.EnableAnnotations,
+		Unikernel:             h.Unikernel,
+	}, nil
+}
+
 func newFactoryConfig(f factory) (oci.FactoryConfig, error) {
 	if f.TemplatePath == "" {
 		f.TemplatePath = defaultTemplatePath
@@ -910,6 +984,9 @@ func updateRuntimeConfigHypervisor(configPath string, tomlConf tomlConfig, confi
 		case clhHypervisorTableType:
 			config.HypervisorType = vc.ClhHypervisor
 			hConfig, err = newClhHypervisorConfig(hypervisor)
+		case uruncHypervisorTableType:
+			config.HypervisorType = vc.UruncHypervisor
+			hConfig, err = newUruncHypervisorConfig(hypervisor)
 		}
 
 		if err != nil {
@@ -1060,6 +1137,7 @@ func GetDefaultHypervisorConfig() vc.HypervisorConfig {
 		GuestSwap:               defaultGuestSwap,
 		Rootless:                defaultRootlessHypervisor,
 		DisableSeccomp:          defaultDisableSeccomp,
+		Unikernel:               false,
 	}
 }
 
