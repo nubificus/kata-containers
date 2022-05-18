@@ -922,7 +922,14 @@ func (c *Container) start(ctx context.Context) error {
 	if err := c.checkSandboxRunning("start"); err != nil {
 		return err
 	}
-	c.Logger().WithField("src", "uruncio").WithField("containerID", c.id).Error("virtcontainers/container.go/start")
+	logF := logrus.Fields{"src": "uruncio", "file": "vc/container.go", "func": "start"}
+	c.Logger().WithFields(logF).WithField("containerID", c.id).Error("c.start()")
+	// If the hypervisorType is urunc, set running and return nil error
+	if c.sandbox.GetHypervisorType() == string(UruncHypervisor) {
+		c.setContainerState(types.StateRunning)
+		return nil
+	}
+	c.Logger().WithFields(logF).WithField("hypervisorType", c.sandbox.GetHypervisorType()).Error("c.start()")
 
 	if c.state.State != types.StateReady &&
 		c.state.State != types.StateStopped {

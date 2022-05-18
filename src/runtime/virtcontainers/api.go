@@ -55,7 +55,8 @@ func CreateSandbox(ctx context.Context, sandboxConfig SandboxConfig, factory Fac
 
 func createSandboxFromConfig(ctx context.Context, sandboxConfig SandboxConfig, factory Factory) (_ *Sandbox, err error) {
 	unikernelFlag := sandboxConfig.HypervisorConfig.Unikernel
-	virtLog.WithField("unikernel", unikernelFlag).WithField("src", "uruncio").Error("virtcontainers/api.go/createSandboxFromConfig")
+	logF := logrus.Fields{"src": "uruncio", "file": "vc/api.go", "func": "createSandboxFromConfig"}
+	virtLog.WithFields(logF).WithField("unikernel", unikernelFlag).Error("createSandboxFromConfig")
 	span, ctx := katatrace.Trace(ctx, virtLog, "createSandboxFromConfig", apiTracingTags)
 	defer span.End()
 

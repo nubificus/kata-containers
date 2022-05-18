@@ -26,6 +26,7 @@ import (
 	"github.com/kata-containers/kata-containers/src/runtime/virtcontainers/pkg/rootless"
 	"github.com/opencontainers/runtime-spec/specs-go"
 	"github.com/pkg/errors"
+	"github.com/sirupsen/logrus"
 
 	// only register the proto type
 	crioption "github.com/containerd/containerd/pkg/runtimeoptions/v1"
@@ -149,6 +150,7 @@ func create(ctx context.Context, s *service, r *taskAPI.CreateTaskRequest) (*con
 			return nil, err
 		}
 		s.sandbox = sandbox
+		// check that
 		pid, _ := s.sandbox.GetHypervisorPid()
 		// if err != nil {
 		// 	return nil, err
@@ -189,7 +191,8 @@ func create(ctx context.Context, s *service, r *taskAPI.CreateTaskRequest) (*con
 	if err != nil {
 		return nil, err
 	}
-
+	logF := logrus.Fields{"src": "uruncio", "file": "cs/create.go", "func": "create"}
+	shimLog.WithFields(logF).WithField("containerId", container.id).Error("Probably ok create")
 	return container, nil
 }
 

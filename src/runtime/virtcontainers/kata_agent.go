@@ -335,7 +335,8 @@ func (k *kataAgent) handleTraceSettings(config KataAgentConfig) bool {
 }
 
 func (k *kataAgent) init(ctx context.Context, sandbox *Sandbox, config KataAgentConfig) (disableVMShutdown bool, err error) {
-	k.Logger().WithField("type", "doutsos").Error("virtcontainers/kata_agent/init")
+	logF := logrus.Fields{"src": "uruncio", "file": "vc/kata_agent.go", "func": "init"}
+	k.Logger().WithFields(logF).Error("kata agent init")
 	// Save
 	k.ctx = sandbox.ctx
 

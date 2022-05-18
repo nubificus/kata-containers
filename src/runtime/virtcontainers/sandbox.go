@@ -17,6 +17,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strings"
 	"sync"
 	"syscall"
 
@@ -366,6 +367,9 @@ func (s *Sandbox) Monitor(ctx context.Context) (chan error, error) {
 
 // WaitProcess waits on a container process and return its exit code
 func (s *Sandbox) WaitProcess(ctx context.Context, containerID, processID string) (int32, error) {
+	logF := logrus.Fields{"src": "uruncio", "file": "vc/sandbox.go", "func": "WaitProcess"}
+	s.Logger().WithFields(logF).Error("WaitProcess")
+
 	if s.state.State != types.StateRunning {
 		return 0, errSandboxNotRunning
 	}
@@ -1356,15 +1360,25 @@ func (s *Sandbox) CreateContainer(ctx context.Context, contConfig ContainerConfi
 
 // StartContainer starts a container in the sandbox
 func (s *Sandbox) StartContainer(ctx context.Context, containerID string) (VCContainer, error) {
+	logF := logrus.Fields{"src": "uruncio", "file": "vc/sandbox.go", "func": "StartContainer"}
+	unikernelFlag := false
+	if strings.Contains(containerID, "-unikernel") {
+		unikernelFlag = true
+	}
+
+	if unikernelFlag {
+		s.Logger().WithFields(logF).WithField("unikernel", "true").Error("StartContainer")
+		containerID = strings.ReplaceAll(containerID, "-unikernel", "")
+	}
 	// Fetch the container.
 	c, err := s.findContainer(containerID)
 	if err != nil {
 		return nil, err
 	}
 
-	s.Logger().WithField("src", "uruncio").Error("virtcontainers/sandbox.go/StartContainer")
 	unikernel := s.hypervisor.HypervisorConfig().Unikernel
-	s.Logger().WithField("src", "uruncio").WithField("unikernel", unikernel).Error("virtcontainers/sandbox.go/StartContainer")
+	s.Logger().WithFields(logF).WithField("unikernel", unikernel).Error("StartContainer")
+	s.Logger().WithFields(logF).WithField("hypervisorVMid", s.hypervisor.HypervisorConfig().VMid).Error("StartContainer")
 
 	// Start it.
 	if err = c.start(ctx); err != nil {
@@ -1375,8 +1389,7 @@ func (s *Sandbox) StartContainer(ctx context.Context, containerID string) (VCCon
 		return nil, err
 	}
 
-	s.Logger().WithField("container", containerID).Info("Container is started")
-	s.Logger().WithField("src", "uruncio").Error("virtcontainers/sandbox.go/StartContainer")
+	s.Logger().WithFields(logF).Error("Container is started")
 
 	// Update sandbox resources in case a stopped container
 	// is started
@@ -1644,7 +1657,8 @@ func (s *Sandbox) createContainers(ctx context.Context) error {
 func (s *Sandbox) Start(ctx context.Context) error {
 
 	if s.hypervisor.HypervisorConfig().Unikernel {
-		s.Logger().WithField("src", "uruncio").WithField("unikernel", true).Error("virtcontainers/sandbox.go/Start")
+		logF := logrus.Fields{"src": "uruncio", "file": "vc/sandbox.go", "func": "Start"}
+		s.Logger().WithFields(logF).WithField("unikernel", true).Error("sandbox start")
 		if err := s.setSandboxState(types.StateRunning); err != nil {
 			return err
 		}
@@ -1679,12 +1693,14 @@ func (s *Sandbox) Start(ctx context.Context) error {
 		}
 	}
 	// unikernel := s.hypervisor.HypervisorConfig().Unikernel
-	// s.Logger().WithField("src", "uruncio").WithField("unikernel", unikernel).Error("virtcontainers/sandbox.go/Start")
+	// s.Logger().WithFields(logF).WithField("unikernel", unikernel).Error("virtcontainers/sandbox.go/Start")
 
 	// s.Logger().Info("Sandbox is started")
-	s.Logger().WithField("src", "uruncio").Error("virtcontainers/sandbox.go/sandbox.Start")
-	// s.Logger().WithField("src", "uruncio").WithField("sandboxID", s.ID()).Error("virtcontainers/sandbox.go/sandbox.Start")
-	// s.Logger().WithField("src", "uruncio").WithField("unikernel", s.hypervisor.HypervisorConfig().Unikernel).Error("virtcontainers/sandbox.go/sandbox.Start")
+	logF := logrus.Fields{"src": "uruncio", "file": "vc/sandbox.go", "func": "Start"}
+
+	s.Logger().WithFields(logF).Error("Sandbox is started")
+	// s.Logger().WithFields(logF).WithField("sandboxID", s.ID()).Error("virtcontainers/sandbox.go/sandbox.Start")
+	// s.Logger().WithFields(logF).WithField("unikernel", s.hypervisor.HypervisorConfig().Unikernel).Error("virtcontainers/sandbox.go/sandbox.Start")
 	return nil
 
 }

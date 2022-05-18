@@ -17,7 +17,10 @@ import (
 	pbTypes "github.com/kata-containers/kata-containers/src/runtime/virtcontainers/pkg/agent/protocols"
 	"github.com/kata-containers/kata-containers/src/runtime/virtcontainers/types"
 	specs "github.com/opencontainers/runtime-spec/specs-go"
+	"github.com/sirupsen/logrus"
 )
+
+var mockLog = logrus.WithField("source", "vcmock")
 
 // ID implements the VCSandbox function of the same name.
 func (s *Sandbox) ID() string {
@@ -168,6 +171,8 @@ func (s *Sandbox) UpdateContainer(ctx context.Context, containerID string, resou
 
 // WaitProcess implements the VCSandbox function of the same name.
 func (s *Sandbox) WaitProcess(ctx context.Context, containerID, processID string) (int32, error) {
+	logF := logrus.Fields{"src": "uruncio", "file": "vc/pkg/vcmock/sandbox.go", "func": "WaitProcess"}
+	mockLog.WithFields(logF).Error("vcmock WaitProcess")
 	return 0, nil
 }
 

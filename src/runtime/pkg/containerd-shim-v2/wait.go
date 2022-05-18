@@ -22,15 +22,23 @@ import (
 const defaultCheckInterval = 1 * time.Second
 
 func wait(ctx context.Context, s *service, c *container, execID string) (int32, error) {
+	logF := logrus.Fields{"src": "uruncio", "file": "cs/wait.go", "func": "wait"}
+	shimLog.WithField("container", c.id).WithFields(logF).Error("wait started")
+
 	var execs *exec
 	var err error
 
 	processID := c.id
 
 	if execID == "" {
+		shimLog.WithField("container", c.id).WithFields(logF).WithField("execID", execID).Error("execID empty")
+
 		//wait until the io closed, then wait the container
+		// When running urunc operation halts here
 		<-c.exitIOch
 		shimLog.WithField("container", c.id).Debug("The container io streams closed")
+		shimLog.WithField("container", c.id).WithFields(logF).Error("container io streams closed")
+
 	} else {
 		execs, err = c.getExec(execID)
 		if err != nil {
@@ -102,6 +110,7 @@ func wait(ctx context.Context, s *service, c *container, execID string) (int32, 
 	s.mu.Unlock()
 
 	go cReap(s, int(ret), c.id, execID, timeStamp)
+	shimLog.WithField("container", c.id).WithFields(logF).Error("wait ended")
 
 	return ret, nil
 }

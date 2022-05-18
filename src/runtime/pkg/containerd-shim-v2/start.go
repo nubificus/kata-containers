@@ -7,14 +7,21 @@ package containerdshim
 
 import (
 	"context"
+	"errors"
 	"fmt"
+
 	"github.com/sirupsen/logrus"
 
 	"github.com/containerd/containerd/api/types/task"
 	"github.com/kata-containers/kata-containers/src/runtime/pkg/katautils"
+	urunc "github.com/kata-containers/kata-containers/src/runtime/pkg/urunc"
 )
 
 func startContainer(ctx context.Context, s *service, c *container) (retErr error) {
+	unikernelCreated := false
+	var cmd Command
+	logF := logrus.Fields{"src": "uruncio", "file": "cs/start.go", "func": "startContainer"}
+
 	shimLog.WithField("container", c.id).Debug("start container")
 	defer func() {
 		if retErr != nil {
@@ -23,6 +30,46 @@ func startContainer(ctx context.Context, s *service, c *container) (retErr error
 		}
 	}()
 	// start a container
+	shimLog.WithField("containerType", c.cType).WithFields(logF).Error("container info")
+	shimLog.WithField("hyperVisorpid", s.hpid).WithFields(logF).Error("container info")
+	shimLog.WithField("shimpid", s.pid).WithFields(logF).Error("container info")
+	shimLog.WithField("hypervisorUnikernel", s.config.HypervisorConfig.Unikernel).WithFields(logF).Error("container info")
+
+	// Check if config has unikernel set to true and binary exists in rootfs
+	unikernelFile, err := urunc.FindExecutable()
+	if s.config.HypervisorConfig.Unikernel && err != nil {
+		return errors.New("unikernel not found in rootfs")
+	}
+
+	if s.config.HypervisorConfig.Unikernel && c.cType.IsSandbox() {
+		shimLog.WithField("unikernelFile", unikernelFile).WithFields(logF).Error("is unikernel and is sandbox")
+		shimLog.WithFields(logF).Error("starting sandbox")
+		s.sandbox.Start(ctx)
+		shimLog.WithFields(logF).Error("sandbox started")
+
+		shimLog.WithFields(logF).Error("starting container")
+
+		_, err := s.sandbox.StartContainer(ctx, c.id+"-unikernel")
+		if err != nil {
+			return err
+		}
+		shimLog.WithFields(logF).Error("container started")
+
+		// here we create the command, perhaps I need to move it down (?)
+		cmd = Command{
+			cmd:       unikernelFile,
+			container: c,
+			id:        c.id,
+			stdin:     c.stdin,
+			stdout:    c.stdout,
+			stderr:    c.stderr,
+			bundle:    c.bundle,
+		}
+		unikernelCreated = true
+		shimLog.WithField("cmd.id", cmd.id).WithField("c.bundle", c.bundle).WithFields(logF).Error("info")
+
+	}
+
 	if c.cType == "" {
 		err := fmt.Errorf("Bug, the container %s type is empty", c.id)
 		return err
@@ -33,30 +80,52 @@ func startContainer(ctx context.Context, s *service, c *container) (retErr error
 		return err
 	}
 
-	if c.cType.IsSandbox() {
-		err := s.sandbox.Start(ctx)
-		if err != nil {
-			return err
-		}
-		// Start monitor after starting sandbox
-		s.monitor, err = s.sandbox.Monitor(ctx)
-		if err != nil {
-			return err
-		}
-		go watchSandbox(ctx, s)
+	shimLog.WithField("s.sandbox", "not nil").WithFields(logF).Error("sandbox not nil")
 
-		// We use s.ctx(`ctx` derived from `s.ctx`) to check for cancellation of the
-		// shim context and the context passed to startContainer for tracing.
-		go watchOOMEvents(ctx, s)
-	} else {
-		_, err := s.sandbox.StartContainer(ctx, c.id)
-		if err != nil {
-			return err
+	// If the hypervisor is not urunc, execute the normal flow
+	if !s.config.HypervisorConfig.Unikernel {
+		if c.cType.IsSandbox() {
+			shimLog.WithField("cType", c.cType).WithFields(logF).Error("start unikernel exec")
+
+			err := s.sandbox.Start(ctx)
+			if err != nil {
+				return err
+			}
+			// Start monitor after starting sandbox
+			s.monitor, err = s.sandbox.Monitor(ctx)
+			if err != nil {
+				return err
+			}
+			go watchSandbox(ctx, s)
+
+			// We use s.ctx(`ctx` derived from `s.ctx`) to check for cancellation of the
+			// shim context and the context passed to startContainer for tracing.
+			go watchOOMEvents(ctx, s)
+		} else {
+			_, err := s.sandbox.StartContainer(ctx, c.id)
+			if err != nil {
+				return err
+			}
 		}
 	}
 
+	if unikernelCreated {
+		shimLog.WithFields(logF).Error("ready to start unikernel")
+		shimLog.WithField("unikPath", cmd.cmd).WithFields(logF).Error("letsgo")
+
+		// cmd run will connect the pipes or return them
+		// we will also need a goroutine to Wait for the command
+		// to run in order to notify the container's channels
+		// and terminate gracefully
+		cmd.Run()
+
+		return errors.New("not implemented")
+
+	}
+
 	// Run post-start OCI hooks.
-	err := katautils.EnterNetNS(s.sandbox.GetNetNs(), func() error {
+	shimLog.WithFields(logF).Error("post-start OCI hook")
+	err = katautils.EnterNetNS(s.sandbox.GetNetNs(), func() error {
 		return katautils.PostStartHooks(ctx, *c.spec, s.sandbox.ID(), c.bundle)
 	})
 	if err != nil {
@@ -66,6 +135,7 @@ func startContainer(ctx context.Context, s *service, c *container) (retErr error
 	}
 
 	c.status = task.StatusRunning
+	shimLog.WithField("c.status", c.status).WithFields(logF).Error("cs/start.go/startContainer")
 
 	stdin, stdout, stderr, err := s.sandbox.IOStream(c.id, c.id)
 	if err != nil {
