@@ -352,7 +352,13 @@ func (s *Sandbox) Status() SandboxStatus {
 
 // Monitor returns a error channel for watcher to watch at
 func (s *Sandbox) Monitor(ctx context.Context) (chan error, error) {
+	logF := logrus.Fields{
+		"src":      "uruncio",
+		"file":     "vc/sandbox.go",
+		"function": "Monitor",
+	}
 	if s.state.State != types.StateRunning {
+		s.Logger().WithFields(logF).WithField("sandbox.state.State", s.state.State).Error("Sandbox State")
 		return nil, errSandboxNotRunning
 	}
 
@@ -371,11 +377,15 @@ func (s *Sandbox) WaitProcess(ctx context.Context, containerID, processID string
 	s.Logger().WithFields(logF).Error("WaitProcess")
 
 	if s.state.State != types.StateRunning {
+		s.Logger().WithFields(logF).WithField("sandbox.state.State", s.state.State).Error("Sandbox State")
 		return 0, errSandboxNotRunning
 	}
 
 	c, err := s.findContainer(containerID)
+
 	if err != nil {
+		s.Logger().WithFields(logF).Error("Container not found")
+
 		return 0, err
 	}
 
@@ -385,7 +395,13 @@ func (s *Sandbox) WaitProcess(ctx context.Context, containerID, processID string
 // SignalProcess sends a signal to a process of a container when all is false.
 // When all is true, it sends the signal to all processes of a container.
 func (s *Sandbox) SignalProcess(ctx context.Context, containerID, processID string, signal syscall.Signal, all bool) error {
+	logF := logrus.Fields{
+		"src":      "uruncio",
+		"file":     "vc/sandbox.go",
+		"function": "SignalProcess",
+	}
 	if s.state.State != types.StateRunning {
+		s.Logger().WithFields(logF).WithField("sandbox.state.State", s.state.State).Error("Sandbox State")
 		return errSandboxNotRunning
 	}
 
@@ -399,7 +415,18 @@ func (s *Sandbox) SignalProcess(ctx context.Context, containerID, processID stri
 
 // WinsizeProcess resizes the tty window of a process
 func (s *Sandbox) WinsizeProcess(ctx context.Context, containerID, processID string, height, width uint32) error {
+	logF := logrus.Fields{
+		"src":      "uruncio",
+		"file":     "vc/sandbox.go",
+		"function": "WinsizeProcess",
+	}
 	if s.state.State != types.StateRunning {
+		s.Logger().WithFields(logF).WithField("sandbox.state.State", s.state.State).Error("Sandbox State")
+		if s.hypervisor.Unikernel() {
+			s.Logger().WithFields(logF).Error("Is unikernel")
+			return nil
+		}
+
 		return errSandboxNotRunning
 	}
 
@@ -413,7 +440,13 @@ func (s *Sandbox) WinsizeProcess(ctx context.Context, containerID, processID str
 
 // IOStream returns stdin writer, stdout reader and stderr reader of a process
 func (s *Sandbox) IOStream(containerID, processID string) (io.WriteCloser, io.Reader, io.Reader, error) {
+	logF := logrus.Fields{
+		"src":      "uruncio",
+		"file":     "vc/sandbox.go",
+		"function": "IOStream",
+	}
 	if s.state.State != types.StateRunning {
+		s.Logger().WithFields(logF).WithField("sandbox.state.State", s.state.State).Error("Sandbox State")
 		return nil, nil, nil, errSandboxNotRunning
 	}
 

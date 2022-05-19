@@ -973,6 +973,7 @@ type Hypervisor interface {
 	Disconnect(ctx context.Context)
 	Capabilities(ctx context.Context) types.Capabilities
 	HypervisorConfig() HypervisorConfig
+	Unikernel() bool
 	GetThreadIDs(ctx context.Context) (VcpuThreadIDs, error)
 	Cleanup(ctx context.Context) error
 	// getPids returns a slice of hypervisor related process ids.

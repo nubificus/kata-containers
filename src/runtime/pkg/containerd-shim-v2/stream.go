@@ -88,6 +88,8 @@ func newTtyIO(ctx context.Context, stdin, stdout, stderr string, console bool) (
 }
 
 func ioCopy(shimLog *logrus.Entry, exitch, stdinCloser chan struct{}, tty *ttyIO, stdinPipe io.WriteCloser, stdoutPipe, stderrPipe io.Reader) {
+	logF := logrus.Fields{"src": "uruncio", "file": "cs/stream.go", "func": "ioCopy"}
+	shimLog.WithFields(logF).Error("ioCopy started")
 	var wg sync.WaitGroup
 
 	if tty.Stdin != nil {
@@ -137,4 +139,5 @@ func ioCopy(shimLog *logrus.Entry, exitch, stdinCloser chan struct{}, tty *ttyIO
 	tty.close()
 	close(exitch)
 	shimLog.Debug("all io stream copy goroutines exited")
+	shimLog.WithFields(logF).Error("all cmd io stream copy goroutines exited")
 }

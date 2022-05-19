@@ -501,13 +501,24 @@ func (s *service) Delete(ctx context.Context, r *taskAPI.DeleteRequest) (_ *task
 	shimLog.WithFields(logF).WithField("container", r.ID).Error("getcontainer 2 (delete)")
 
 	if err != nil {
+		shimLog.WithFields(logF).Error("getcontainer_delete err")
+
 		return nil, err
 	}
 
 	if r.ExecID == "" {
+		shimLog.WithFields(logF).Error("ExecID empty")
+
 		if err = deleteContainer(spanCtx, s, c); err != nil {
+			shimLog.WithFields(logF).Error("deleteContainer err")
 			return nil, err
 		}
+
+		shimLog.WithFields(logF).WithField("ContainerID", c.id).WithField("Pid", s.hpid).Error("TaskDelete info")
+
+		currentPid := uint32(os.Getpid())
+		s.hpid = currentPid
+		shimLog.WithFields(logF).WithField("shim-Pid", s.hpid).Error("TaskDelete info")
 
 		s.send(&eventstypes.TaskDelete{
 			ContainerID: c.id,
@@ -615,6 +626,8 @@ func (s *service) ResizePty(ctx context.Context, r *taskAPI.ResizePtyRequest) (_
 		processID = execs.id
 
 	}
+	shimLog.WithFields(logF).WithField("container", r.ID).Error("RESIZE")
+
 	err = s.sandbox.WinsizeProcess(spanCtx, c.id, processID, r.Height, r.Width)
 	if err != nil {
 		return nil, err

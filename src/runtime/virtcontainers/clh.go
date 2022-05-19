@@ -187,6 +187,10 @@ var clhDebugKernelParams = []Param{
 //
 //###########################################################
 
+func (clh *cloudHypervisor) Unikernel() bool {
+	return false
+}
+
 func (clh *cloudHypervisor) setConfig(config *HypervisorConfig) error {
 	err := config.Valid()
 	if err != nil {

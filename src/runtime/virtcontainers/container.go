@@ -894,11 +894,16 @@ func (c *Container) delete(ctx context.Context) error {
 // for and is only used to make the returned error as descriptive as
 // possible.
 func (c *Container) checkSandboxRunning(cmd string) error {
+	logF := logrus.Fields{
+		"src":  "uruncio",
+		"file": "vc/container.go/checkSandboxRunning",
+	}
 	if cmd == "" {
 		return fmt.Errorf("Cmd cannot be empty")
 	}
 
 	if c.sandbox.state.State != types.StateRunning {
+		c.Logger().WithFields(logF).Error("container create failed")
 		return fmt.Errorf("Sandbox not running, impossible to %s the container", cmd)
 	}
 

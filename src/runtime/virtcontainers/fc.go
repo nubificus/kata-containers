@@ -171,6 +171,10 @@ type firecrackerDevice struct {
 	devType DeviceType
 }
 
+func (fc *firecracker) Unikernel() bool {
+	return false
+}
+
 // Logger returns a logrus logger appropriate for logging firecracker  messages
 func (fc *firecracker) Logger() *logrus.Entry {
 	return virtLog.WithField("subsystem", "firecracker")

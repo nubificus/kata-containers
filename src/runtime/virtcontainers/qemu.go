@@ -162,6 +162,10 @@ func (l qmpLogger) Errorf(format string, v ...interface{}) {
 	l.logger.Errorf(format, v...)
 }
 
+func (q *qemu) Unikernel() bool {
+	return false
+}
+
 // Logger returns a logrus logger appropriate for logging qemu messages
 func (q *qemu) Logger() *logrus.Entry {
 	return hvLogger.WithField("subsystem", "qemu")

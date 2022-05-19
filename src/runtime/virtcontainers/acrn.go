@@ -139,6 +139,10 @@ var acrnDefaultKernelParameters = []Param{
 	{"panic", "1"},
 }
 
+func (a *Acrn) Unikernel() bool {
+	return false
+}
+
 func (a *Acrn) kernelParameters() string {
 	// get a list of arch kernel parameters
 	params := a.arch.kernelParameters(a.config.Debug)

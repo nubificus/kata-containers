@@ -19,7 +19,7 @@ import (
 
 func startContainer(ctx context.Context, s *service, c *container) (retErr error) {
 	unikernelCreated := false
-	var cmd Command
+	var cmd *Command
 	logF := logrus.Fields{"src": "uruncio", "file": "cs/start.go", "func": "startContainer"}
 
 	shimLog.WithField("container", c.id).Debug("start container")
@@ -56,15 +56,7 @@ func startContainer(ctx context.Context, s *service, c *container) (retErr error
 		shimLog.WithFields(logF).Error("container started")
 
 		// here we create the command, perhaps I need to move it down (?)
-		cmd = Command{
-			cmd:       unikernelFile,
-			container: c,
-			id:        c.id,
-			stdin:     c.stdin,
-			stdout:    c.stdout,
-			stderr:    c.stderr,
-			bundle:    c.bundle,
-		}
+		cmd = CreateCommand(unikernelFile, c)
 		unikernelCreated = true
 		shimLog.WithField("cmd.id", cmd.id).WithField("c.bundle", c.bundle).WithFields(logF).Error("info")
 
@@ -109,20 +101,6 @@ func startContainer(ctx context.Context, s *service, c *container) (retErr error
 		}
 	}
 
-	if unikernelCreated {
-		shimLog.WithFields(logF).Error("ready to start unikernel")
-		shimLog.WithField("unikPath", cmd.cmd).WithFields(logF).Error("letsgo")
-
-		// cmd run will connect the pipes or return them
-		// we will also need a goroutine to Wait for the command
-		// to run in order to notify the container's channels
-		// and terminate gracefully
-		cmd.Run()
-
-		return errors.New("not implemented")
-
-	}
-
 	// Run post-start OCI hooks.
 	shimLog.WithFields(logF).Error("post-start OCI hook")
 	err = katautils.EnterNetNS(s.sandbox.GetNetNs(), func() error {
@@ -134,31 +112,54 @@ func startContainer(ctx context.Context, s *service, c *container) (retErr error
 		shimLog.WithError(err).Warn("Failed to run post-start hooks")
 	}
 
-	c.status = task.StatusRunning
-	shimLog.WithField("c.status", c.status).WithFields(logF).Error("cs/start.go/startContainer")
-
-	stdin, stdout, stderr, err := s.sandbox.IOStream(c.id, c.id)
-	if err != nil {
-		return err
-	}
-
-	c.stdinPipe = stdin
-
-	if c.stdin != "" || c.stdout != "" || c.stderr != "" {
-		tty, err := newTtyIO(ctx, c.stdin, c.stdout, c.stderr, c.terminal)
+	if unikernelCreated {
+		shimLog.WithFields(logF).Error("ready to start unikernel")
+		shimLog.WithField("unikPath", cmd.cmdString).WithFields(logF).Error("letsgo")
+		err := cmd.SetIO(ctx)
 		if err != nil {
 			return err
 		}
-		c.ttyio = tty
+		err = cmd.Start()
+		if err != nil {
+			return err
+		}
+		go cmd.Wait()
 
-		go ioCopy(shimLog.WithField("container", c.id), c.exitIOch, c.stdinCloser, tty, stdin, stdout, stderr)
+		// cmd run will connect the pipes or return them
+		// we will also need a goroutine to Wait for the command
+		// to run in order to notify the container's channels
+		// and terminate gracefully
+		// err = cmd.Wait()
+		go wait(ctx, s, c, "")
+		return nil
+
 	} else {
-		// close the io exit channel, since there is no io for this container,
-		// otherwise the following wait goroutine will hang on this channel.
-		close(c.exitIOch)
-		// close the stdin closer channel to notify that it's safe to close process's
-		// io.
-		close(c.stdinCloser)
+		c.status = task.StatusRunning
+		shimLog.WithField("c.status", c.status).WithFields(logF).Error("cs/start.go/startContainer")
+
+		stdin, stdout, stderr, err := s.sandbox.IOStream(c.id, c.id)
+		if err != nil {
+			return err
+		}
+
+		c.stdinPipe = stdin
+
+		if c.stdin != "" || c.stdout != "" || c.stderr != "" {
+			tty, err := newTtyIO(ctx, c.stdin, c.stdout, c.stderr, c.terminal)
+			if err != nil {
+				return err
+			}
+			c.ttyio = tty
+
+			go ioCopy(shimLog.WithField("container", c.id), c.exitIOch, c.stdinCloser, tty, stdin, stdout, stderr)
+		} else {
+			// close the io exit channel, since there is no io for this container,
+			// otherwise the following wait goroutine will hang on this channel.
+			close(c.exitIOch)
+			// close the stdin closer channel to notify that it's safe to close process's
+			// io.
+			close(c.stdinCloser)
+		}
 	}
 
 	go wait(ctx, s, c, "")

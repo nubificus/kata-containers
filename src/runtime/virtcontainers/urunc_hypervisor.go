@@ -20,6 +20,10 @@ type uruncHypervisor struct {
 	mockPid int
 }
 
+func (u *uruncHypervisor) Unikernel() bool {
+	return true
+}
+
 func (u *uruncHypervisor) Capabilities(ctx context.Context) types.Capabilities {
 	caps := types.Capabilities{}
 	caps.SetFsSharingSupport()
