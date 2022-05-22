@@ -1847,6 +1847,7 @@ func (s *Sandbox) HotplugAddDevice(ctx context.Context, device api.Device, devTy
 	span, ctx := katatrace.Trace(ctx, s.Logger(), "HotplugAddDevice", sandboxTracingTags, map[string]string{"sandbox_id": s.id})
 	defer span.End()
 
+	s.Logger().WithFields(logrus.Fields{ "sandbox":         s.id, }).Error("ADD BLOCK")
 	if s.sandboxController != nil {
 		if err := s.sandboxController.AddDevice(device.GetHostPath()); err != nil {
 			s.Logger().WithError(err).WithField("device", device).
@@ -1875,6 +1876,8 @@ func (s *Sandbox) HotplugAddDevice(ctx context.Context, device api.Device, devTy
 		}
 		return nil
 	case config.DeviceBlock:
+		s.Logger().WithFields(logrus.Fields{ "sandbox":         s.id, }).Error("ADD BLOCK")
+
 		blockDevice, ok := device.(*drivers.BlockDevice)
 		if !ok {
 			return fmt.Errorf("device type mismatch, expect device type to be %s", devType)
@@ -1991,6 +1994,7 @@ func (s *Sandbox) AddDevice(ctx context.Context, info config.DeviceInfo) (api.De
 		return nil, fmt.Errorf("device manager isn't initialized")
 	}
 
+	s.Logger().WithFields(logrus.Fields{ "sandbox":         s.id, }).Error("ADD BLOCK")
 	var err error
 	b, err := s.devManager.NewDevice(info)
 	if err != nil {

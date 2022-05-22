@@ -111,10 +111,10 @@ func (c *Command) Wait() error {
 
 	shimLog.WithFields(logF).Error("cmd completed")
 
-	close(c.container.exitIOch)
+	//close(c.container.exitIOch)
 	shimLog.WithFields(logF).Error("exitIOch closed")
 
-	close(c.container.stdinCloser)
+	//close(c.container.stdinCloser)
 	shimLog.WithFields(logF).Error("stdinCloser closed")
 
 	c.container.status = task.StatusStopped

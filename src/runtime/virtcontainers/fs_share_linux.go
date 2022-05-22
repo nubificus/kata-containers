@@ -376,6 +376,7 @@ func (f *FilesystemShare) ShareRootFilesystem(ctx context.Context, c *Container)
 	}
 	rootfsGuestPath := filepath.Join(kataGuestSharedDir(), c.id, c.rootfsSuffix)
 
+	f.Logger().WithField("device", c.state.BlockDeviceID).Error("BLOCKDEV")
 	if c.state.Fstype != "" && c.state.BlockDeviceID != "" {
 		// The rootfs storage volume represents the container rootfs
 		// mount point inside the guest.

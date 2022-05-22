@@ -42,7 +42,10 @@ func FindExecutable() (string, error) {
 		return "", err
 	}
 
+	uruncLog.WithField("msg", "in findexec").Error("urunc/utils.go/Command")
 	files, err := ioutil.ReadDir(path + "/rootfs/unikernel/")
+	uruncLog.WithField("path", path).Error("urunc/utils.go/Command")
+	uruncLog.WithField("files", files).Error("urunc/utils.go/Command")
 	if err != nil {
 		return "", err
 	}
@@ -52,7 +55,7 @@ func FindExecutable() (string, error) {
 	}
 
 	unikernelFile := files[0].Name()
-	unikernelFile = path + "/rootfs/unikernel/" + unikernelFile
+	unikernelFile = "/opt/unikata/bin/solo5-hvt " + path + "/rootfs/unikernel/" + unikernelFile
 	return unikernelFile, nil
 
 }

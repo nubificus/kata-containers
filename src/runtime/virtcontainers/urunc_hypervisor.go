@@ -9,12 +9,14 @@ import (
 	"context"
 	"errors"
 	"os"
+	"github.com/sirupsen/logrus"
 
 	hv "github.com/kata-containers/kata-containers/src/runtime/pkg/hypervisors"
 	"github.com/kata-containers/kata-containers/src/runtime/virtcontainers/types"
 )
 
 var UruncHybridVSockPath = "/tmp/kata-mock-hybrid-vsock.socket"
+
 
 type uruncHypervisor struct {
 	mockPid int
@@ -24,6 +26,10 @@ func (u *uruncHypervisor) Unikernel() bool {
 	return true
 }
 
+// Logger returns a logrus logger appropriate for logging firecracker  messages
+func (u *uruncHypervisor) Logger() *logrus.Entry {
+	return virtLog.WithField("subsystem", "URUNC")
+}
 func (u *uruncHypervisor) Capabilities(ctx context.Context) types.Capabilities {
 	caps := types.Capabilities{}
 	caps.SetFsSharingSupport()
@@ -31,6 +37,7 @@ func (u *uruncHypervisor) Capabilities(ctx context.Context) types.Capabilities {
 }
 
 func (u *uruncHypervisor) HypervisorConfig() HypervisorConfig {
+	u.Logger().WithField("in here!", "blahblahblah").Error()
 	return HypervisorConfig{}
 }
 
@@ -75,6 +82,8 @@ func (u *uruncHypervisor) AddDevice(ctx context.Context, devInfo interface{}, de
 }
 
 func (u *uruncHypervisor) HotplugAddDevice(ctx context.Context, devInfo interface{}, devType DeviceType) (interface{}, error) {
+	u.Logger().WithField("in hotplug add", "HOTPLUG").Error()
+	u.Logger().WithField("in hotplug add", devType).Error()
 	switch devType {
 	case CpuDev:
 		return devInfo.(uint32), nil

@@ -7,7 +7,7 @@ package containerdshim
 
 import (
 	"context"
-	"errors"
+	//"errors"
 	"fmt"
 
 	"github.com/sirupsen/logrus"
@@ -38,7 +38,8 @@ func startContainer(ctx context.Context, s *service, c *container) (retErr error
 	// Check if config has unikernel set to true and binary exists in rootfs
 	unikernelFile, err := urunc.FindExecutable()
 	if s.config.HypervisorConfig.Unikernel && err != nil {
-		return errors.New("unikernel not found in rootfs")
+		err := fmt.Errorf("unikernel file not found!:%d", c.id)
+		return err
 	}
 
 	if s.config.HypervisorConfig.Unikernel && c.cType.IsSandbox() {
@@ -130,8 +131,8 @@ func startContainer(ctx context.Context, s *service, c *container) (retErr error
 		// to run in order to notify the container's channels
 		// and terminate gracefully
 		// err = cmd.Wait()
-		go wait(ctx, s, c, "")
-		return nil
+		//go wait(ctx, s, c, "")
+		//return nil
 
 	} else {
 		c.status = task.StatusRunning
