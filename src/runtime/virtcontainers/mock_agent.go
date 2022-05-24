@@ -112,7 +112,7 @@ func (n *mockAgent) createContainer(ctx context.Context, sandbox *Sandbox, c *Co
 		if err != nil {
 			n.Logger().WithFields(logF).WithField("errmsg", err.Error()).Error("mkdir error")
 		} else {
-			n.Logger().WithFields(logF).WithField("out", string(mkdirOut)).Error("mkdir OK")
+			n.Logger().WithFields(logF).WithField("out", string(mkdirOut)).Error("mdkir OK")
 		}
 
 		// mount dev to dir
@@ -149,12 +149,6 @@ func (n *mockAgent) createContainer(ctx context.Context, sandbox *Sandbox, c *Co
 
 	}
 
-	// sharedRootfs, err := sandbox.fsShare.ShareRootFilesystem(ctx, c)
-	// if err == nil {
-	// 	n.Logger().WithFields(logF).Error(sharedRootfs.guestPath)
-	// } else {
-	// 	n.Logger().WithFields(logF).WithField("errm", err.Error()).Error("No sharedRootfs")
-	// }
 	return &Process{}, nil
 }
 

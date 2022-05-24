@@ -140,11 +140,11 @@ func (c *Command) WaitTest() error {
 		shimLog.WithFields(logF).Error("cmd completed")
 
 		// ananos' diff
-		// close(c.container.exitIOch)
+		 close(c.container.exitIOch)
 		// shimLog.WithFields(logF).Error("exitIOch closed")
 
 		// ananos' diff
-		// close(c.container.stdinCloser)
+		 close(c.container.stdinCloser)
 		// shimLog.WithFields(logF).Error("stdinCloser closed")
 
 		c.container.status = task.StatusStopped

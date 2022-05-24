@@ -72,7 +72,10 @@ func FindExecutable() (string, error) {
 
 	if devmapRootfs {
 		unikernelFile = path + "/unikernel/" + unikernelFile
+	} else {
+		unikernelFile = path + "/rootfs/unikernel/" + unikernelFile
 	}
+
 
 	unikernelFile = "/opt/unikata/bin/solo5-hvt " + unikernelFile
 	//return unikernelFile, nil
