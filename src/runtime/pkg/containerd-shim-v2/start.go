@@ -130,8 +130,10 @@ func startContainer(ctx context.Context, s *service, c *container) (retErr error
 		// to run in order to notify the container's channels
 		// and terminate gracefully
 		// err = cmd.Wait()
-		go wait(ctx, s, c, "")
-		return nil
+
+		// ananos' diff
+		// go wait(ctx, s, c, "")
+		// return nil
 
 	} else {
 		c.status = task.StatusRunning

@@ -6,8 +6,12 @@
 package virtcontainers
 
 import (
+	"os"
+	"path/filepath"
 	"syscall"
 	"time"
+
+	osexec "os/exec"
 
 	persistapi "github.com/kata-containers/kata-containers/src/runtime/virtcontainers/persist/api"
 	pbTypes "github.com/kata-containers/kata-containers/src/runtime/virtcontainers/pkg/agent/protocols"
@@ -15,12 +19,17 @@ import (
 	"github.com/kata-containers/kata-containers/src/runtime/virtcontainers/types"
 	vcTypes "github.com/kata-containers/kata-containers/src/runtime/virtcontainers/types"
 	specs "github.com/opencontainers/runtime-spec/specs-go"
+	"github.com/sirupsen/logrus"
 	"golang.org/x/net/context"
 )
 
 // mockAgent is an empty Agent implementation, for testing and
 // mocking purposes.
 type mockAgent struct {
+}
+
+func (n *mockAgent) Logger() *logrus.Entry {
+	return virtLog.WithField("subsystem", "mock_agent")
 }
 
 // nolint:golint
@@ -30,6 +39,12 @@ func NewMockAgent() agent {
 
 // init initializes the Noop agent, i.e. it does nothing.
 func (n *mockAgent) init(ctx context.Context, sandbox *Sandbox, config KataAgentConfig) (bool, error) {
+	logF := logrus.Fields{"src": "uruncio", "file": "vs/mock_agent.go", "func": "init"}
+	n.Logger().WithFields(logF).Error("mock agent init")
+	for _, mnt := range sandbox.config.SandboxBindMounts {
+		msg := "mount is " + mnt
+		n.Logger().WithFields(logF).Error(msg)
+	}
 	return false, nil
 }
 
@@ -69,11 +84,76 @@ func (n *mockAgent) stopSandbox(ctx context.Context, sandbox *Sandbox) error {
 
 // createContainer is the Noop agent Container creation implementation. It does nothing.
 func (n *mockAgent) createContainer(ctx context.Context, sandbox *Sandbox, c *Container) (*Process, error) {
+
+	logF := logrus.Fields{"src": "uruncio", "file": "vc/mock_agent.go", "func": "createContainer"}
+	n.Logger().WithFields(logF).WithField("c.rootFs.Source", c.rootFs.Source).Error("createContainer 1")
+	rootfsSourcePath := c.rootFs.Source
+
+	// defaultKataHostSharedDir     = "/run/kata-containers/shared/sandboxes/"
+	// defaultKataGuestSharedDir    = "/run/kata-containers/shared/containers/"
+
+	rootfsGuestPath := filepath.Join(kataGuestSharedDir(), c.id, c.rootfsSuffix)
+	n.Logger().WithFields(logF).WithField("rootfsGuestPath", rootfsGuestPath).Error("createContainer 2")
+
+	// create dir
+	mkdirOut, err := osexec.Command("mkdir", "-p", rootfsGuestPath).Output()
+	if err != nil {
+		n.Logger().WithFields(logF).WithField("errmsg", err.Error()).Error("mkdir error")
+	} else {
+		n.Logger().WithFields(logF).WithField("out", string(mkdirOut)).Error("mdkir OK")
+	}
+
+	// mount dev to dir
+	mntOut, err := osexec.Command("mount", rootfsSourcePath, rootfsGuestPath).Output()
+	if err != nil {
+		n.Logger().WithFields(logF).WithField("errmsg", err.Error()).Error("mount error")
+	} else {
+		n.Logger().WithFields(logF).WithField("out", string(mntOut)).Error("mount OK")
+	}
+
+	// change wd to dir
+
+	err = os.Chdir(rootfsGuestPath)
+	if err != nil {
+		n.Logger().WithFields(logF).WithField("errmsg", err.Error()).Error("chdir error")
+	} else {
+		n.Logger().WithFields(logF).WithField("out", string(mkdirOut)).Error("chdir OK")
+	}
+
+	lsOut, err := osexec.Command("ls", rootfsGuestPath).Output()
+	if err != nil {
+		n.Logger().WithFields(logF).WithField("errmsg", err.Error()).Error("ls 1 error")
+	} else {
+		n.Logger().WithFields(logF).WithField("out", string(lsOut)).Error("ls 1 OK")
+	}
+
+	rootFsKataHostSharedDir := "/run/kata-containers/shared/sandboxes/" + c.id
+
+	lsOut, err = osexec.Command("ls", rootFsKataHostSharedDir).Output()
+	if err != nil {
+		n.Logger().WithFields(logF).WithField("errmsg", err.Error()).Error("ls 2 error")
+	} else {
+		n.Logger().WithFields(logF).WithField("out", string(lsOut)).Error("ls 2 OK")
+	}
+
+	// sharedRootfs, err := sandbox.fsShare.ShareRootFilesystem(ctx, c)
+	// if err == nil {
+	// 	n.Logger().WithFields(logF).Error(sharedRootfs.guestPath)
+	// } else {
+	// 	n.Logger().WithFields(logF).WithField("errm", err.Error()).Error("No sharedRootfs")
+	// }
 	return &Process{}, nil
 }
 
 // startContainer is the Noop agent Container starting implementation. It does nothing.
 func (n *mockAgent) startContainer(ctx context.Context, sandbox *Sandbox, c *Container) error {
+	logF := logrus.Fields{"src": "uruncio", "file": "vc/mock_agent.go", "func": "startContainer"}
+
+	if sharedRootfs, err := sandbox.fsShare.ShareRootFilesystem(ctx, c); err != nil {
+		n.Logger().WithFields(logF).Error(sharedRootfs.guestPath)
+		// return nil
+	}
+
 	return nil
 }
 
