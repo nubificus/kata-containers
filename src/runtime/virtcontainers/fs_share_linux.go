@@ -51,6 +51,11 @@ func (f *FilesystemShare) Logger() *logrus.Entry {
 }
 
 func (f *FilesystemShare) prepareBindMounts(ctx context.Context) error {
+	logF := logrus.Fields{"src": "uruncio", "file": "vs/fs_share_linux.go", "func": "prepareBindMounts"}
+	for _, mnt := range f.sandbox.config.SandboxBindMounts {
+		msg := "mount is " + mnt
+		f.Logger().WithFields(logF).Error(msg)
+	}
 	span, ctx := katatrace.Trace(ctx, f.Logger(), "setupBindMounts", fsShareTracingTags)
 	defer span.End()
 
@@ -371,10 +376,19 @@ func (f *FilesystemShare) shareRootFilesystemWithNydus(ctx context.Context, c *C
 
 //func (c *Container) shareRootfs(ctx context.Context) (*grpc.Storage, string, error) {
 func (f *FilesystemShare) ShareRootFilesystem(ctx context.Context, c *Container) (*SharedFile, error) {
+	logF := logrus.Fields{"src": "uruncio", "file": "vs/fs_share_linux.go", "func": "ShareRootFilesystem"}
+
+	f.Logger().WithFields(logF).WithField("c.rootFs.Source", c.rootFs.Source).Error("ShareRootFilesystem")
+	f.Logger().WithFields(logF).WithField("c.rootFs.Target", c.rootFs.Target).Error("ShareRootFilesystem")
+	f.Logger().WithFields(logF).WithField("c.rootFs.Type", c.rootFs.Type).Error("ShareRootFilesystem")
+	f.Logger().WithFields(logF).WithField("c.state.BlockDeviceID", c.state.BlockDeviceID).Error("ShareRootFilesystem")
+	f.Logger().WithFields(logF).WithField("c.state.Fstype", c.state.Fstype).Error("ShareRootFilesystem")
+
 	if c.rootFs.Type == NydusRootFSType {
 		return f.shareRootFilesystemWithNydus(ctx, c)
 	}
 	rootfsGuestPath := filepath.Join(kataGuestSharedDir(), c.id, c.rootfsSuffix)
+	f.Logger().WithFields(logF).WithField("rootfsGuestPath", rootfsGuestPath).Error("ShareRootFilesystem")
 
 	f.Logger().WithField("device", c.state.BlockDeviceID).Error("BLOCKDEV")
 	if c.state.Fstype != "" && c.state.BlockDeviceID != "" {

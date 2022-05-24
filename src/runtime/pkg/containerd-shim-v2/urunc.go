@@ -131,6 +131,7 @@ func (c *Command) WaitTest() error {
 	}()
 
 	go func() {
+		// [TODO] check if sleep is needed, remove if not
 		time.Sleep(500 * time.Millisecond)
 
 		c.exec.Wait()
@@ -138,11 +139,13 @@ func (c *Command) WaitTest() error {
 
 		shimLog.WithFields(logF).Error("cmd completed")
 
-		close(c.container.exitIOch)
-		shimLog.WithFields(logF).Error("exitIOch closed")
+		// ananos' diff
+		// close(c.container.exitIOch)
+		// shimLog.WithFields(logF).Error("exitIOch closed")
 
-		close(c.container.stdinCloser)
-		shimLog.WithFields(logF).Error("stdinCloser closed")
+		// ananos' diff
+		// close(c.container.stdinCloser)
+		// shimLog.WithFields(logF).Error("stdinCloser closed")
 
 		c.container.status = task.StatusStopped
 		shimLog.WithFields(logF).Error("container.status: StatusStopped")

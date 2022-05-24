@@ -19,6 +19,7 @@ require (
 	github.com/cri-o/cri-o v1.0.0-rc2.0.20170928185954-3394b3b2d6af
 	github.com/docker/go-units v0.4.0
 	github.com/fsnotify/fsnotify v1.4.9
+	github.com/gntouts/cmdcap v0.0.3
 	github.com/go-ini/ini v1.28.2
 	github.com/go-openapi/errors v0.18.0
 	github.com/go-openapi/runtime v0.18.0
