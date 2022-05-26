@@ -563,7 +563,7 @@ func newSandbox(ctx context.Context, sandboxConfig SandboxConfig, factory Factor
 	// create agent instance
 	var agent agent
 	if sandboxConfig.HypervisorType == UruncHypervisor {
-		agent = getNewMockAgentFunc()()
+		agent = getNewUruncAgentFunc()()
 	} else {
 		agent = getNewAgentFunc(ctx)()
 	}

@@ -33,8 +33,8 @@ func getNewAgentFunc(ctx context.Context) newAgentFuncType {
 	return newKataAgent
 }
 
-func getNewMockAgentFunc() newAgentFuncType {
-	return NewMockAgent
+func getNewUruncAgentFunc() newAgentFuncType {
+	return NewUruncAgent
 }
 
 // WithNewAgentFunc set newAgentFuncKey in `ctx`
