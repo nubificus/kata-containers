@@ -90,7 +90,7 @@ func createSandboxFromConfig(ctx context.Context, sandboxConfig SandboxConfig, f
 		return nil, err
 	}
 
-	if !unikernelFlag {
+	//if !unikernelFlag {
 		// Start the VM
 		if err = s.startVM(ctx); err != nil {
 			return nil, err
@@ -115,7 +115,7 @@ func createSandboxFromConfig(ctx context.Context, sandboxConfig SandboxConfig, f
 		}
 
 		return s, nil
-	}
+	//}
 
 	s.postCreatedNetwork(ctx)
 

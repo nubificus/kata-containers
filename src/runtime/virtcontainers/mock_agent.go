@@ -26,6 +26,9 @@ import (
 // mockAgent is an empty Agent implementation, for testing and
 // mocking purposes.
 type mockAgent struct {
+	container *Container
+	IPAddress string
+	mask	string
 }
 
 func (n *mockAgent) Logger() *logrus.Entry {
@@ -74,6 +77,23 @@ func (n *mockAgent) exec(ctx context.Context, sandbox *Sandbox, c Container, cmd
 
 // startSandbox is the Noop agent Sandbox starting implementation. It does nothing.
 func (n *mockAgent) startSandbox(ctx context.Context, sandbox *Sandbox) error {
+
+	// Setup network interfaces and routes
+	interfaces, routes, neighs, err := generateVCNetworkStructures(ctx, sandbox.network)
+	if err != nil {
+		return err
+	}
+
+	n.Logger().WithField("interfaces", interfaces).Error("createContainer 4")
+	//msg="createContainer 4" interfaces="[&Interface{Device:eth0,Name:eth0,IPAddresses:[]*IPAddress{&IPAddress{Family:v4,Address:10.4.0.20,Mask:24,XXX_unrecognized:[],},&IPAddress{Family:v6,Address:fe80::9c89:5ff:feb5:86d5,Mask:64,XXX_unrecognized:[],},},Mtu:1500,HwAddr:9e:89:05:b5:86:d5,PciPath:,Type:,RawFlags:0,XXX_unrecognized:[],}]" name=containerd-shim-v2 pid=1371845 sandbox=c06d6ba018f0036de74eb529263801b5ea7c611384478d9ecf5385992e4c9edd source=virtcontainers subsystem=mock_agent
+	IPAddress := interfaces[0].IPAddresses[0].Address
+	mask := interfaces[0].IPAddresses[0].Mask
+	n.Logger().WithField("IPAddress", IPAddress).Error("createContainer 4.5")
+	n.Logger().WithField("mask", mask).Error("createContainer 4.5")
+	n.Logger().WithField("routes", routes).Error("createContainer 4.5")
+	n.Logger().WithField("neighs", neighs).Error("createContainer 4.5")
+	n.IPAddress = IPAddress
+	n.mask = mask
 	return nil
 }
 
@@ -93,8 +113,9 @@ func (n *mockAgent) createContainer(ctx context.Context, sandbox *Sandbox, c *Co
 
 	// defaultKataHostSharedDir     = "/run/kata-containers/shared/sandboxes/"
 	// defaultKataGuestSharedDir    = "/run/kata-containers/shared/containers/"
+	n.container = c
 
-	rootfsGuestPath := filepath.Join(kataGuestSharedDir(), c.id, c.rootfsSuffix)
+	rootfsGuestPath := filepath.Join("/run/kata-containers/shared/containers/", c.id, c.rootfsSuffix)
 	n.Logger().WithFields(logF).WithField("rootfsGuestPath", rootfsGuestPath).Error("createContainer 2")
 
 	// then it is a devmapper device
@@ -124,7 +145,7 @@ func (n *mockAgent) createContainer(ctx context.Context, sandbox *Sandbox, c *Co
 		}
 
 		// change wd to dir
-		err = os.Chdir(rootfsGuestPath)
+		//err = os.Chdir(rootfsGuestPath)
 		if err != nil {
 			n.Logger().WithFields(logF).WithField("errmsg", err.Error()).Error("chdir error")
 		} else {
@@ -171,6 +192,23 @@ func (n *mockAgent) stopContainer(ctx context.Context, sandbox *Sandbox, c Conta
 	n.Logger().WithFields(logF).WithField("rootfsSourcePath", rootfsSourcePath).Error("stopContainer 1")
 
 	if rootfsSourcePath != "" {
+
+
+		cwd, err := os.Getwd()
+		n.Logger().WithFields(logF).WithField("cwd", cwd).Error("getcwd")
+		if err != nil {
+			n.Logger().WithFields(logF).WithField("errmsg", err.Error()).Error("chdir error")
+		}
+		err = os.Chdir("/")
+		if err != nil {
+			n.Logger().WithFields(logF).WithField("errmsg", err.Error()).Error("chdir error")
+		}
+		cwd, err = os.Getwd()
+		n.Logger().WithFields(logF).WithField("cwd", cwd).Error("getcwd")
+		if err != nil {
+			n.Logger().WithFields(logF).WithField("errmsg", err.Error()).Error("chdir error")
+		}
+
 		umntOut, err := osexec.Command("umount", "/run/kata-containers/shared/containers/"+c.id+"/rootfs").Output()
 		if err != nil {
 			n.Logger().WithFields(logF).WithField("errmsg", err.Error()).Error("unmount error")

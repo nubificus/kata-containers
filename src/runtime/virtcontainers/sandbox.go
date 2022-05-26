@@ -978,6 +978,7 @@ func (s *Sandbox) AddInterface(ctx context.Context, inf *pbTypes.Interface) (*pb
 		return nil, err
 	}
 
+	s.Logger().WithField("ipaddresses", netInfo.Addrs[0]).Error("ADDENDPOINT")
 	return result, nil
 }
 

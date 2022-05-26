@@ -38,26 +38,29 @@ func Command(name string, arg ...string) int {
 	return cmd.Process.Pid
 }
 
+//func FindExecutable(path string) (string, error) {
 func FindExecutable() (string, error) {
 	logF := logrus.Fields{"src": "uruncio", "file": "pkg/urunc/utils.go", "func": "FindExecutable"}
 
 	devmapRootfs := false
+
+
+	var files []fs.FileInfo
 
 	path, err := os.Getwd()
 	if err != nil {
 		return "", err
 	}
 	uruncLog.WithFields(logF).WithField("path", path).Error("current path")
-
-	var files []fs.FileInfo
-
 	if strings.Contains(path, "rootfs") {
+		uruncLog.WithFields(logF).WithField("rootfs", path).Error("current path")
 		devmapRootfs = true
 		files, err = ioutil.ReadDir(path + "/unikernel/")
 		if err != nil {
 			return "", err
 		}
 	} else {
+		uruncLog.WithFields(logF).WithField("without rootfs", path).Error("current path")
 		files, err = ioutil.ReadDir(path + "/rootfs/unikernel/")
 		if err != nil {
 			return "", err
@@ -80,6 +83,8 @@ func FindExecutable() (string, error) {
 	unikernelFile = "/opt/unikata/bin/solo5-hvt " + unikernelFile
 	//return unikernelFile, nil
 
+	
+	os.Chdir("../../")
 	return unikernelFile, nil
 
 }

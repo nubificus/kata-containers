@@ -77,7 +77,29 @@ func (u *uruncHypervisor) SaveVM() error {
 	return nil
 }
 
+
+func (u *uruncHypervisor) uruncAddNetDevice(ctx context.Context, endpoint Endpoint) error {
+
+	GuestMac :=          endpoint.HardwareAddr()
+	ifaceID := endpoint.Name() 
+	HostDevName :=       endpoint.NetworkPair().TapInterface.TAPIface.Name
+
+	u.Logger().WithField("iFaceID", ifaceID).Error()
+	u.Logger().WithField("GuestMac", GuestMac).Error()
+	u.Logger().WithField("HostDevName", HostDevName).Error()
+
+	return nil
+}
+
 func (u *uruncHypervisor) AddDevice(ctx context.Context, devInfo interface{}, devType DeviceType) error {
+	u.Logger().WithField("in AddDEvice", "InADdDevice").Error()
+	switch v := devInfo.(type) {
+	case Endpoint:
+		u.uruncAddNetDevice(ctx, v)
+	default:
+		u.Logger().WithField("in AddDEvice", "didn't get a network device").Error()
+	}
+
 	return nil
 }
 

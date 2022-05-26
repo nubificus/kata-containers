@@ -8,6 +8,7 @@ package containerdshim
 import (
 	"context"
 	//"errors"
+	//"path/filepath"
 	"fmt"
 
 	"github.com/sirupsen/logrus"
@@ -36,6 +37,7 @@ func startContainer(ctx context.Context, s *service, c *container) (retErr error
 	shimLog.WithField("hypervisorUnikernel", s.config.HypervisorConfig.Unikernel).WithFields(logF).Error("container info")
 
 	// Check if config has unikernel set to true and binary exists in rootfs
+	//unikernelFile, err := urunc.FindExecutable(filepath.Join("/run/kata-containers/shared/containers/", c.id, c.rootfsSuffix))
 	unikernelFile, err := urunc.FindExecutable()
 	if s.config.HypervisorConfig.Unikernel && err != nil {
 		err := fmt.Errorf("unikernel file not found!:%d", c.id)
