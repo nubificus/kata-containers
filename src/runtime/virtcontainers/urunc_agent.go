@@ -193,7 +193,7 @@ func (u *uruncAgent) createContainer(ctx context.Context, sandbox *Sandbox, c *C
 
 	cwdPath = strings.ReplaceAll(cwdPath, " ", "")
 	cwdPath = strings.TrimSpace(cwdPath)
-	rootFsPath := cwdPath + c.id + "/" + c.rootfsSuffix
+	rootFsPath := cwdPath + "/" + c.rootfsSuffix
 	u.Logger().WithFields(logF).WithField("rootFsPath", rootFsPath).Error("")
 
 	// we need to check if is devmapper or not.
