@@ -12,6 +12,7 @@ import (
 
 	hv "github.com/kata-containers/kata-containers/src/runtime/pkg/hypervisors"
 	"github.com/kata-containers/kata-containers/src/runtime/virtcontainers/types"
+	"github.com/sirupsen/logrus"
 )
 
 var UruncHybridVSockPath = "/tmp/kata-mock-hybrid-vsock.socket"
@@ -22,6 +23,10 @@ type uruncHypervisor struct {
 
 func (u *uruncHypervisor) Unikernel() bool {
 	return true
+}
+
+func (u *uruncHypervisor) Logger() *logrus.Entry {
+	return virtLog.WithField("subsystem", "URUNC")
 }
 
 func (u *uruncHypervisor) Capabilities(ctx context.Context) types.Capabilities {
@@ -71,6 +76,16 @@ func (u *uruncHypervisor) SaveVM() error {
 }
 
 func (u *uruncHypervisor) AddDevice(ctx context.Context, devInfo interface{}, devType DeviceType) error {
+	logF := logrus.Fields{"src": "uruncio", "file": "cs/urunc_hypervisor.go", "func": "AddDevice"}
+
+	u.Logger().WithFields(logF).WithField("in AddDEvice", "InADdDevice").Error()
+	switch v := devInfo.(type) {
+	case Endpoint:
+		u.uruncAddNetDevice(ctx, v)
+	default:
+		u.Logger().WithField("in AddDEvice", "didn't get a network device").Error()
+	}
+
 	return nil
 }
 
@@ -93,6 +108,19 @@ func (u *uruncHypervisor) HotplugRemoveDevice(ctx context.Context, devInfo inter
 		return 0, nil
 	}
 	return nil, nil
+}
+func (u *uruncHypervisor) uruncAddNetDevice(ctx context.Context, endpoint Endpoint) error {
+
+	GuestMac := endpoint.HardwareAddr()
+	ifaceID := endpoint.Name()
+	HostDevName := endpoint.NetworkPair().TapInterface.TAPIface.Name
+	logF := logrus.Fields{"src": "uruncio", "file": "cs/urunc_hypervisor.go", "func": "uruncAddNetDevice"}
+
+	u.Logger().WithFields(logF).WithField("iFaceID", ifaceID).Error()
+	u.Logger().WithFields(logF).WithField("GuestMac", GuestMac).Error()
+	u.Logger().WithFields(logF).WithField("HostDevName", HostDevName).Error()
+
+	return nil
 }
 
 func (u *uruncHypervisor) GetVMConsole(ctx context.Context, sandboxID string) (string, string, error) {

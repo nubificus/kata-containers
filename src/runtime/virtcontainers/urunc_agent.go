@@ -25,18 +25,42 @@ import (
 	"golang.org/x/net/context"
 )
 
+// This is intented to pass the required data back to containerd-shim
+type ExecData struct {
+	BinaryType string
+	BinaryPath string
+	IPAddress  string
+	Mask       string
+	Container  *Container
+}
+
 // uruncAgent is an empty Agent implementation, for deploying unikernels
 // We can add some fields here if we need to persist data between agent calls.
 type uruncAgent struct {
+	ExecData ExecData
 }
 
 func (u *uruncAgent) Logger() *logrus.Entry {
 	return virtLog.WithField("subsystem", "urunc_agent")
 }
 
+func newExecData() ExecData {
+	return ExecData{
+		BinaryType: "",
+		BinaryPath: "",
+		IPAddress:  "",
+		Mask:       "",
+	}
+}
+
 // nolint:golint
 func NewUruncAgent() agent {
-	return &uruncAgent{}
+	data := newExecData()
+	return &uruncAgent{ExecData: data}
+}
+
+func (u *uruncAgent) GetExecData() ExecData {
+	return u.ExecData
 }
 
 // init initializes the Noop agent, i.e. it does nothing.
@@ -76,6 +100,23 @@ func (u *uruncAgent) exec(ctx context.Context, sandbox *Sandbox, c Container, cm
 
 // startSandbox is the Noop agent Sandbox starting implementatiou. It does nothing.
 func (u *uruncAgent) startSandbox(ctx context.Context, sandbox *Sandbox) error {
+	logF := logrus.Fields{"src": "uruncio", "file": "vc/urunc_agent.go", "func": "startSandbox"}
+
+	interfaces, _, _, err := generateVCNetworkStructures(ctx, sandbox.network)
+	// interfaces, routes, neighs, err := generateVCNetworkStructures(ctx, sandbox.network)
+	if err != nil {
+		return err
+	}
+	// u.Logger().WithFields(logF).WithField("interfaces", interfaces).Error("createContainer 4")
+	//msg="createContainer 4" interfaces="[&Interface{Device:eth0,Name:eth0,IPAddresses:[]*IPAddress{&IPAddress{Family:v4,Address:10.4.0.20,Mask:24,XXX_unrecognized:[],},&IPAddress{Family:v6,Address:fe80::9c89:5ff:feb5:86d5,Mask:64,XXX_unrecognized:[],},},Mtu:1500,HwAddr:9e:89:05:b5:86:d5,PciPath:,Type:,RawFlags:0,XXX_unrecognized:[],}]" name=containerd-shim-v2 pid=1371845 sandbox=c06d6ba018f0036de74eb529263801b5ea7c611384478d9ecf5385992e4c9edd source=virtcontainers subsystem=mock_agent
+	IPAddress := interfaces[0].IPAddresses[0].Address
+	mask := interfaces[0].IPAddresses[0].Mask
+	u.Logger().WithFields(logF).WithField("IPAddress", IPAddress).Error("createContainer 4.5")
+	u.Logger().WithFields(logF).WithField("mask", mask).Error("createContainer 4.5")
+	// u.Logger().WithFields(logF).WithField("routes", routes).Error("createContainer 4.5")
+	// u.Logger().WithFields(logF).WithField("neighs", neighs).Error("createContainer 4.5")
+	u.ExecData.IPAddress = IPAddress
+	u.ExecData.Mask = mask
 	return nil
 }
 
@@ -87,6 +128,34 @@ func (u *uruncAgent) stopSandbox(ctx context.Context, sandbox *Sandbox) error {
 // createContainer is the Noop agent Container creation implementatiou. It does nothing.
 func (u *uruncAgent) createContainer(ctx context.Context, sandbox *Sandbox, c *Container) (*Process, error) {
 	logF := logrus.Fields{"src": "uruncio", "file": "vc/urunc_agent.go", "func": "createContainer"}
+
+	u.ExecData.Container = c
+
+	if u.ExecData.IPAddress == "" {
+		u.Logger().WithFields(logF).Error("IP empty, generating...")
+
+		interfaces, _, _, err := generateVCNetworkStructures(ctx, sandbox.network)
+		// interfaces, routes, neighs, err := generateVCNetworkStructures(ctx, sandbox.network)
+		if err != nil {
+			u.Logger().WithFields(logF).WithField("errmsg", err.Error()).Error("IP error...")
+		}
+		u.Logger().WithFields(logF).Error("IP generated...")
+
+		u.Logger().WithFields(logF).WithField("interfaces", len(interfaces)).Error("IP1")
+		// interfaces is 0
+		u.Logger().WithFields(logF).WithField("IPAddresses", len(interfaces[0].IPAddresses)).Error("IP2")
+		IPAddress := interfaces[0].IPAddresses[0].Address
+
+		u.Logger().WithFields(logF).Error("IP found...")
+		mask := interfaces[0].IPAddresses[0].Mask
+		u.Logger().WithFields(logF).Error("Mask found...")
+
+		u.Logger().WithFields(logF).WithField("IPAddress", IPAddress).Error("createContainer 4.5")
+		u.Logger().WithFields(logF).WithField("mask", mask).Error("createContainer 4.5")
+		u.ExecData.IPAddress = IPAddress
+		u.ExecData.Mask = mask
+	}
+	u.Logger().WithFields(logF).WithField("IPADDR", u.ExecData.IPAddress).Error("IPADDR")
 
 	// first lets get some data to better understand the process.
 
@@ -155,8 +224,6 @@ func (u *uruncAgent) createContainer(ctx context.Context, sandbox *Sandbox, c *C
 	// if it contains a single /unikernel/file, we execute that file.
 	// if it contains a single /pause file, we do nothing (or execute it, we must explore that)
 	// if it contains a /unikernel/*.hvt file, we must create a cmd string and execute it,.
-	var binaryType string
-	var binaryPath string
 
 	lsResult := string(ls3out)
 	lsResult = strings.ReplaceAll(lsResult, "\n", "")
@@ -165,11 +232,8 @@ func (u *uruncAgent) createContainer(ctx context.Context, sandbox *Sandbox, c *C
 	u.Logger().WithFields(logF).WithField("lsResult", lsResult).Error("")
 
 	if lsResult == "pause" {
-		binaryType = "pause"
-		binaryPath = rootFsPath + "/pause"
-		u.Logger().WithFields(logF).WithField("binaryType", binaryType).WithField("binaryPath", binaryPath).Error("")
-
-		// for now let's do nothing on Pause containers
+		u.ExecData.BinaryType = "pause"
+		u.ExecData.BinaryPath = rootFsPath + "/pause"
 	} else if lsResult != "unikernel" {
 		return &Process{}, errors.New("requested image not supported")
 	} else {
@@ -184,91 +248,29 @@ func (u *uruncAgent) createContainer(ctx context.Context, sandbox *Sandbox, c *C
 		lsResult = strings.ReplaceAll(lsResult, "\n", "")
 		lsResult = strings.ReplaceAll(lsResult, "/", "")
 		lsResult = strings.ReplaceAll(lsResult, " ", "")
-		u.Logger().WithFields(logF).WithField("unikernelBinary", string(lsResult)).Error("")
+		u.Logger().WithFields(logF).WithField("unikernelBinary", string(lsResult)).Error("ls4out")
 
 		// now let's check if ".hvt" or not
+		if strings.Contains(lsResult, ".hvt") {
+			u.ExecData.BinaryType = "hvt"
+			u.ExecData.BinaryPath = rootFsPath + "/unikernel/" + lsResult
+		} else {
+			u.ExecData.BinaryType = "unikernel"
+			u.ExecData.BinaryPath = rootFsPath + "/unikernel/" + lsResult
+		}
 	}
+	u.Logger().WithFields(logF).WithField("u.ExecData", u.ExecData.BinaryType).Error("return")
 
 	// we must also create a netns, find the IP and pass them as args to qemu
 
-	// Notes:
-
-	// LS on devmapper: address config.json log rootfs shim-binary-path shim.pid work
-
-	return &Process{}, nil
-
-	u.Logger().WithFields(logF).WithField("c.rootFs.Source", c.rootFs.Source).Error("createContainer 1")
-	u.Logger().WithFields(logF).WithField("c.rootfsSuffix", c.rootfsSuffix).Error("createContainer 1.5")
-	rootfsSourcePath := c.rootFs.Source
-	u.Logger().WithFields(logF).WithField("rootfsSourcePath", rootfsSourcePath).Error("createContainer 1.7")
-
-	rootfsGuestPath := filepath.Join(kataGuestSharedDir(), c.id, c.rootfsSuffix)
-	u.Logger().WithFields(logF).WithField("rootfsGuestPath", rootfsGuestPath).Error("createContainer 2")
-
-	// then it is a devmapper device
-	if rootfsSourcePath != "" {
-		// getcwd
-		cwdPath, err := os.Getwd()
-		if err != nil {
-			u.Logger().WithFields(logF).WithField("errmsg", err.Error()).Error("pwd error")
-		} else {
-			u.Logger().WithFields(logF).WithField("cwd", string(cwdPath)).Error("pwd OK")
-		}
-
-		// create dir
-		mkdirOut, err := osexec.Command("mkdir", "-p", rootfsGuestPath).Output()
-		if err != nil {
-			u.Logger().WithFields(logF).WithField("errmsg", err.Error()).Error("mkdir error")
-		} else {
-			u.Logger().WithFields(logF).WithField("out", string(mkdirOut)).Error("mkdir OK")
-		}
-
-		// mount dev to dir
-		mntOut, err := osexec.Command("mount", rootfsSourcePath, rootfsGuestPath).Output()
-		if err != nil {
-			u.Logger().WithFields(logF).WithField("errmsg", err.Error()).Error("mount error")
-		} else {
-			u.Logger().WithFields(logF).WithField("out", string(mntOut)).Error("mount OK")
-		}
-
-		// change wd to dir
-		err = os.Chdir(rootfsGuestPath)
-		if err != nil {
-			u.Logger().WithFields(logF).WithField("errmsg", err.Error()).Error("chdir error")
-		} else {
-			u.Logger().WithFields(logF).WithField("out", string(mkdirOut)).Error("chdir OK")
-		}
-
-		lsOut, err := osexec.Command("ls", rootfsGuestPath).Output()
-		if err != nil {
-			u.Logger().WithFields(logF).WithField("errmsg", err.Error()).Error("ls 1 error")
-		} else {
-			u.Logger().WithFields(logF).WithField("out", string(lsOut)).Error("ls 1 OK")
-		}
-
-		rootFsKataHostSharedDir := "/run/kata-containers/shared/sandboxes/" + c.id
-
-		lsOut, err = osexec.Command("ls", rootFsKataHostSharedDir).Output()
-		if err != nil {
-			u.Logger().WithFields(logF).WithField("errmsg", err.Error()).Error("ls 2 error")
-		} else {
-			u.Logger().WithFields(logF).WithField("out", string(lsOut)).Error("ls 2 OK")
-		}
-
-	}
-
-	// sharedRootfs, err := sandbox.fsShare.ShareRootFilesystem(ctx, c)
-	// if err == nil {
-	// 	u.Logger().WithFields(logF).Error(sharedRootfs.guestPath)
-	// } else {
-	// 	u.Logger().WithFields(logF).WithField("errm", err.Error()).Error("No sharedRootfs")
-	// }
 	return &Process{}, nil
 }
 
 // startContainer is the Noop agent Container starting implementatiou. It does nothing.
 func (u *uruncAgent) startContainer(ctx context.Context, sandbox *Sandbox, c *Container) error {
+
 	logF := logrus.Fields{"src": "uruncio", "file": "vc/urunc_agent.go", "func": "startContainer"}
+	u.Logger().WithFields(logF).Error("START")
 
 	if sharedRootfs, err := sandbox.fsShare.ShareRootFilesystem(ctx, c); err != nil {
 		u.Logger().WithFields(logF).Error(sharedRootfs.guestPath)
@@ -278,18 +280,31 @@ func (u *uruncAgent) startContainer(ctx context.Context, sandbox *Sandbox, c *Co
 	return nil
 }
 
-// stopContainer is the Noop agent Container stopping implementatiou. It does nothing.
+// Unmounts block device and tries to remove any related directories
 func (u *uruncAgent) stopContainer(ctx context.Context, sandbox *Sandbox, c Container) error {
 	logF := logrus.Fields{"src": "uruncio", "file": "vc/urunc_agent.go", "func": "stopContainer"}
 	rootfsSourcePath := c.rootFs.Source
 	u.Logger().WithFields(logF).WithField("rootfsSourcePath", rootfsSourcePath).Error("stopContainer 1")
 
+	rootfsGuestPath := filepath.Join(kataGuestSharedDir(), c.id, c.rootfsSuffix)
+	u.Logger().WithFields(logF).WithField("rootfsGuestPath", rootfsGuestPath).Error("createContainer 2")
+	rootFsPath := "/run/containerd/io.containerd.runtime.v2.task/default/" + c.id + "/" + c.rootfsSuffix
+
 	if rootfsSourcePath != "" {
-		umntOut, err := osexec.Command("umount", "/run/kata-containers/shared/containers/"+c.id+"/rootfs").Output()
+
+		umnt1Out, err := osexec.Command("umount", "/run/kata-containers/shared/containers/"+c.id+"/rootfs").Output()
 		if err != nil {
-			u.Logger().WithFields(logF).WithField("errmsg", err.Error()).Error("unmount error")
+			u.Logger().WithFields(logF).WithField("errmsg", err.Error()).Error("unmount 1 error")
 		} else {
-			u.Logger().WithFields(logF).WithField("out", string(umntOut)).Error("unmount OK")
+			u.Logger().WithFields(logF).WithField("out", string(umnt1Out)).Error("unmount 1 OK")
+		}
+
+		//  This unmount is also handled earlier by kata, but I left it just in case.
+		umnt2Out, err := osexec.Command("umount", rootFsPath).Output()
+		if err != nil {
+			u.Logger().WithFields(logF).WithField("errmsg", err.Error()).Error("unmount 2 error")
+		} else {
+			u.Logger().WithFields(logF).WithField("out", string(umnt2Out)).Error("unmount 2 OK")
 		}
 
 		// remove garbage dirs
@@ -307,25 +322,6 @@ func (u *uruncAgent) stopContainer(ctx context.Context, sandbox *Sandbox, c Cont
 			u.Logger().WithFields(logF).WithField("out", string(rmOut)).Error("rm sandbox OK")
 		}
 	}
-	// defaultKataHostSharedDir     = "/run/kata-containers/shared/sandboxes/"
-	// defaultKataGuestSharedDir    = "/run/kata-containers/shared/containers/"
-
-	// rootfsGuestPath := filepath.Join(kataGuestSharedDir(), c.id, c.rootfsSuffix)
-	// u.Logger().WithFields(logF).WithField("rootfsGuestPath", rootfsGuestPath).Error("createContainer 2")
-
-	// u.Logger().WithFields(logF).WithField("c.rootFs.Source", c.rootFs.Source).Error("stopContainer 1")
-
-	// This is the /dev/dm- path. Not sure if at all useful
-	// rootfsSourcePath := c.rootFs.Source
-
-	// defaultKataHostSharedDir     = "/run/kata-containers/shared/sandboxes/"
-	// defaultKataGuestSharedDir    = "/run/kata-containers/shared/containers/"
-
-	// rootfsGuestPath := filepath.Join(kataGuestSharedDir(), c.id, c.rootfsSuffix)
-	// u.Logger().WithFields(logF).WithField("rootfsGuestPath", rootfsGuestPath).Error("createContainer 2")
-
-	// umount dir
-
 	return nil
 }
 

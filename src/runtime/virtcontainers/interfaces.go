@@ -35,6 +35,7 @@ type VCSandbox interface {
 	GetAllContainers() []VCContainer
 	GetAnnotations() map[string]string
 	GetContainer(containerID string) VCContainer
+	Agent() agent
 	ID() string
 	SetAnnotations(annotations map[string]string) error
 

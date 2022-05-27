@@ -290,6 +290,10 @@ func (k *kataAgent) Logger() *logrus.Entry {
 	return virtLog.WithField("subsystem", "kata_agent")
 }
 
+func (k *kataAgent) GetExecData() ExecData {
+	return ExecData{}
+}
+
 func (k *kataAgent) longLiveConn() bool {
 	return k.keepConn
 }

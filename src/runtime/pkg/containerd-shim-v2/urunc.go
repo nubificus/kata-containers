@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/containerd/containerd/api/types/task"
+	"github.com/kata-containers/kata-containers/src/runtime/virtcontainers"
 	"github.com/sirupsen/logrus"
 )
 
@@ -22,10 +23,11 @@ type Command struct {
 	exec      *osexec.Cmd
 }
 
-func CreateCommand(cmdString string, container *container) *Command {
+func CreateCommand(execData virtcontainers.ExecData, container *container) *Command {
 	logF := logrus.Fields{"src": "uruncio", "file": "cs/urunc.go", "func": "CreateCommand"}
-	shimLog.WithField("cmdString", cmdString).WithFields(logF).Error("exec info")
-	args := strings.Split(cmdString, " ")
+	shimLog.WithField("cmdString", execData.BinaryPath).WithFields(logF).Error("exec info")
+
+	args := strings.Split(execData.BinaryPath, " ")
 	var newCmd *osexec.Cmd
 	if len(args) == 1 {
 		shimLog.WithField("cmdString", args[0]).WithFields(logF).Error("exec info")
@@ -34,7 +36,25 @@ func CreateCommand(cmdString string, container *container) *Command {
 		name, args := args[0], args[1:]
 		newCmd = osexec.Command(name, args...)
 	}
+
+	if execData.BinaryType == "pause" {
+		newCmd = osexec.Command("echo", "PAUSE")
+	}
 	newCmd.Dir = container.bundle
+	cmdString := execData.BinaryPath
+
+	shimLog.WithField("BinaryType", execData.BinaryType).WithFields(logF).Error("exec info")
+
+	// we will handle pause first
+	if execData.BinaryType == "pause" {
+		shimLog.WithFields(logF).Error("type is PAUSE")
+		return &Command{cmdString: "echo PAUSE", container: container, id: container.id, stdin: container.stdin, stdout: container.stdout, stderr: container.stderr, bundle: container.bundle, exec: newCmd}
+	}
+
+	if execData.BinaryType == "hvt" {
+		// do hvt stuff
+
+	}
 	return &Command{cmdString: cmdString, container: container, id: container.id, stdin: container.stdin, stdout: container.stdout, stderr: container.stderr, bundle: container.bundle, exec: newCmd}
 }
 

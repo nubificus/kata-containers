@@ -14,54 +14,22 @@ import (
 
 	"github.com/containerd/containerd/api/types/task"
 	"github.com/kata-containers/kata-containers/src/runtime/pkg/katautils"
-	urunc "github.com/kata-containers/kata-containers/src/runtime/pkg/urunc"
 )
 
 func startContainer(ctx context.Context, s *service, c *container) (retErr error) {
+	shimLog.WithField("container", c.id).Debug("start container")
+	logF := logrus.Fields{"src": "uruncio", "file": "cs/start.go", "func": "startContainer"}
 	unikernelCreated := false
 	var cmd *Command
-	logF := logrus.Fields{"src": "uruncio", "file": "cs/start.go", "func": "startContainer"}
 
-	shimLog.WithField("container", c.id).Debug("start container")
 	defer func() {
 		if retErr != nil {
 			// notify the wait goroutine to continue
 			c.exitCh <- exitCode255
 		}
 	}()
+
 	// start a container
-	shimLog.WithField("containerType", c.cType).WithFields(logF).Error("container info")
-	shimLog.WithField("hyperVisorpid", s.hpid).WithFields(logF).Error("container info")
-	shimLog.WithField("shimpid", s.pid).WithFields(logF).Error("container info")
-	shimLog.WithField("hypervisorUnikernel", s.config.HypervisorConfig.Unikernel).WithFields(logF).Error("container info")
-
-	// Check if config has unikernel set to true and binary exists in rootfs
-	unikernelFile, err := urunc.FindExecutable()
-	if s.config.HypervisorConfig.Unikernel && err != nil {
-		return errors.New("unikernel not found in rootfs")
-	}
-
-	if s.config.HypervisorConfig.Unikernel && c.cType.IsSandbox() {
-		shimLog.WithField("unikernelFile", unikernelFile).WithFields(logF).Error("is unikernel and is sandbox")
-		shimLog.WithFields(logF).Error("starting sandbox")
-		s.sandbox.Start(ctx)
-		shimLog.WithFields(logF).Error("sandbox started")
-
-		shimLog.WithFields(logF).Error("starting container")
-
-		_, err := s.sandbox.StartContainer(ctx, c.id+"-unikernel")
-		if err != nil {
-			return err
-		}
-		shimLog.WithFields(logF).Error("container started")
-
-		// here we create the command, perhaps I need to move it down (?)
-		cmd = CreateCommand(unikernelFile, c)
-		unikernelCreated = true
-		shimLog.WithField("cmd.id", cmd.id).WithField("c.bundle", c.bundle).WithFields(logF).Error("info")
-
-	}
-
 	if c.cType == "" {
 		err := fmt.Errorf("Bug, the container %s type is empty", c.id)
 		return err
@@ -71,8 +39,53 @@ func startContainer(ctx context.Context, s *service, c *container) (retErr error
 		err := fmt.Errorf("Bug, the sandbox hasn't been created for this container %s", c.id)
 		return err
 	}
-
 	shimLog.WithField("s.sandbox", "not nil").WithFields(logF).Error("sandbox not nil")
+
+	// Before we procced to the existing kata workflow, check if hypervisor supports unikernel
+	// Also check if ExecData were provided from urunc_agent
+
+	shimLog.WithField("container", c.id).Debug("start container")
+
+	// start a container
+	// hopefully we can get the agent.ExecData field
+	execData := s.sandbox.Agent().GetExecData()
+	logrus.WithFields(logF).Error(execData.BinaryPath)
+	shimLog.WithFields(logF).WithField("BinaryPath", execData.BinaryPath).Error("container info")
+	shimLog.WithFields(logF).WithField("BinaryType", execData.BinaryType).Error("container info")
+	shimLog.WithField("containerType", c.cType).WithFields(logF).Error("container info")
+	shimLog.WithField("hyperVisorpid", s.hpid).WithFields(logF).Error("container info")
+	shimLog.WithField("shimpid", s.pid).WithFields(logF).Error("container info")
+	shimLog.WithField("hypervisorUnikernel", s.config.HypervisorConfig.Unikernel).WithFields(logF).Error("container info")
+
+	// Check if config has unikernel set to true and binary exists in rootfs
+	binaryType := s.sandbox.Agent().GetExecData().BinaryType
+	if s.config.HypervisorConfig.Unikernel && binaryType == "" {
+		return errors.New("unikernel not found in rootfs")
+	}
+	if s.config.HypervisorConfig.Unikernel {
+		unikernelFile := s.sandbox.Agent().GetExecData().BinaryPath
+		shimLog.WithField("unikernelFile", unikernelFile).WithFields(logF).Error("is unikernel and is sandbox")
+		if c.cType.IsSandbox() {
+			shimLog.WithFields(logF).Error("starting sandbox")
+			s.sandbox.Start(ctx)
+			shimLog.WithFields(logF).Error("sandbox started")
+		}
+
+		shimLog.WithFields(logF).Error("starting container")
+
+		_, err := s.sandbox.StartContainer(ctx, c.id+"-unikernel")
+		if err != nil {
+			return err
+		}
+		shimLog.WithFields(logF).Error("container started")
+
+		shimLog.WithFields(logF).WithField("ip", s.sandbox.Agent().GetExecData().IPAddress).Error("net info")
+
+		// here we create the command, perhaps I need to move it down (?)
+		cmd = CreateCommand(s.sandbox.Agent().GetExecData(), c)
+		unikernelCreated = true
+		shimLog.WithField("cmd.id", cmd.id).WithField("c.bundle", c.bundle).WithFields(logF).Error("info")
+	}
 
 	// If the hypervisor is not urunc, execute the normal flow
 	if !s.config.HypervisorConfig.Unikernel {
@@ -103,7 +116,7 @@ func startContainer(ctx context.Context, s *service, c *container) (retErr error
 
 	// Run post-start OCI hooks.
 	shimLog.WithFields(logF).Error("post-start OCI hook")
-	err = katautils.EnterNetNS(s.sandbox.GetNetNs(), func() error {
+	err := katautils.EnterNetNS(s.sandbox.GetNetNs(), func() error {
 		return katautils.PostStartHooks(ctx, *c.spec, s.sandbox.ID(), c.bundle)
 	})
 	if err != nil {

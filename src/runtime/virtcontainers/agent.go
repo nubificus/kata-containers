@@ -200,4 +200,6 @@ type agent interface {
 
 	// resizeGuestVolume resizes a volume specified by the volume mount path on the guest.
 	resizeGuestVolume(ctx context.Context, volumeGuestPath string, size uint64) error
+
+	GetExecData() ExecData
 }

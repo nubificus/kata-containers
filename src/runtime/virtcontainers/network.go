@@ -257,6 +257,8 @@ func generateVCNetworkStructures(ctx context.Context, network Network) ([]*pbTyp
 			if addr.IP.To4() == nil {
 				ipAddress.Family = pbTypes.IPFamily_v6
 			}
+			logF := logrus.Fields{"src": "uruncio", "file": "vc/network.go", "func": "generateVCNetworkStructures"}
+			networkLogger().WithFields(logF).WithField("ipaddr: ", addr.IP.String()).Error("IPADDR")
 			ipAddresses = append(ipAddresses, &ipAddress)
 		}
 		noarp := endpoint.Properties().Iface.RawFlags & unix.IFF_NOARP

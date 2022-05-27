@@ -355,6 +355,8 @@ func (s *service) Cleanup(ctx context.Context) (_ *taskAPI.DeleteResponse, err e
 
 // Create a new sandbox or container with the underlying OCI runtime
 func (s *service) Create(ctx context.Context, r *taskAPI.CreateTaskRequest) (_ *taskAPI.CreateTaskResponse, err error) {
+	logF := logrus.Fields{"src": "uruncio", "file": "cs/service.go", "func": "Create"}
+	shimLog.WithFields(logF).Error("service create")
 	shimLog.WithField("container", r.ID).Debug("Create() start")
 	defer shimLog.WithField("container", r.ID).Debug("Create() end")
 	start := time.Now()
@@ -414,8 +416,10 @@ func (s *service) Create(ctx context.Context, r *taskAPI.CreateTaskRequest) (_ *
 
 // Start a process
 func (s *service) Start(ctx context.Context, r *taskAPI.StartRequest) (_ *taskAPI.StartResponse, err error) {
-	shimLog.WithField("container", r.ID).Debug("Start() start")
 	logF := logrus.Fields{"src": "uruncio", "file": "cs/service.go", "func": "Start"}
+
+	shimLog.WithFields(logF).Error("service start")
+	shimLog.WithField("container", r.ID).Debug("Start() start")
 	shimLog.WithFields(logF).WithField("container", r.ID).Error("Start() start")
 	defer shimLog.WithFields(logF).WithField("container", r.ID).Error("Start() end")
 	span, spanCtx := katatrace.Trace(s.rootCtx, shimLog, "Start", shimTracingTags)

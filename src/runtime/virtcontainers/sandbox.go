@@ -235,6 +235,10 @@ func (s *Sandbox) ID() string {
 	return s.id
 }
 
+func (s *Sandbox) Agent() agent {
+	return s.agent
+}
+
 // Logger returns a logrus logger appropriate for logging Sandbox messages
 func (s *Sandbox) Logger() *logrus.Entry {
 	return virtLog.WithFields(logrus.Fields{
@@ -977,7 +981,9 @@ func (s *Sandbox) AddInterface(ctx context.Context, inf *pbTypes.Interface) (*pb
 	if err = s.Save(); err != nil {
 		return nil, err
 	}
+	logF := logrus.Fields{"src": "uruncio", "file": "vc/sandbox.go", "func": "AddInterface"}
 
+	s.Logger().WithFields(logF).WithField("ipaddresses", netInfo.Addrs[0]).Error("ADDENDPOINT")
 	return result, nil
 }
 
