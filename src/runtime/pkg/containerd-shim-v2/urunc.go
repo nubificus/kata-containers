@@ -12,6 +12,8 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
+var HvtMonitor string = ""
+
 type Command struct {
 	cmdString string
 	container *container
@@ -23,11 +25,49 @@ type Command struct {
 	exec      *osexec.Cmd
 }
 
+func CmdLine(execData virtcontainers.ExecData) string {
+	switch execData.BinaryType {
+	case "pause":
+		return "sleep infinity"
+	case "hvt":
+		return HvtCmd(execData)
+	case "qemu":
+		return QemuCmd(execData)
+	case " binary":
+		return execData.BinaryPath
+	default:
+		return ""
+	}
+}
+
+func HvtCmd(execData virtcontainers.ExecData) string {
+	// ./tenders/hvt/solo5-hvt --net:service0=tap192  tests/test_net/test_net.hvt
+	return HvtMonitor + "--net:service0=" + execData.Tap + " " + execData.BinaryPath
+}
+
+func QemuCmd(execData virtcontainers.ExecData) string {
+	// qemu-system-x86_64 \
+	//     -cpu host \
+	//     -enable-kvm \
+	//     -m 128 \
+	//     -nodefaults -no-acpi \
+	//     -display none -serial stdio \
+	//     -device isa-debug-exit \
+	//     -net nic,model=virtio \
+	//     -net tap,script=no,ifname=tap106 \
+	//     -kernel /app-helloworld_kvm-x86_64 \
+	//     -append "netdev.ipv4_addr=$IP netdev.ipv4_gw_addr=169.254.1.1 netdev.ipv4_subnet_mask=255.255.255.255 --"
+	return ""
+
+}
+
 func CreateCommand(execData virtcontainers.ExecData, container *container) *Command {
 	logF := logrus.Fields{"src": "uruncio", "file": "cs/urunc.go", "func": "CreateCommand"}
-	shimLog.WithField("cmdString", execData.BinaryPath).WithFields(logF).Error("exec info")
+	cmdString := CmdLine(execData)
+	shimLog.WithField("BinaryType", execData.BinaryType).WithFields(logF).Error("exec info")
+	shimLog.WithField("cmdString", cmdString).WithFields(logF).Error("exec info")
 
-	args := strings.Split(execData.BinaryPath, " ")
+	args := strings.Split(cmdString, " ")
 	var newCmd *osexec.Cmd
 	if len(args) == 1 {
 		shimLog.WithField("cmdString", args[0]).WithFields(logF).Error("exec info")
@@ -35,25 +75,6 @@ func CreateCommand(execData virtcontainers.ExecData, container *container) *Comm
 	} else {
 		name, args := args[0], args[1:]
 		newCmd = osexec.Command(name, args...)
-	}
-
-	if execData.BinaryType == "pause" {
-		newCmd = osexec.Command("echo", "PAUSE")
-	}
-	newCmd.Dir = container.bundle
-	cmdString := execData.BinaryPath
-
-	shimLog.WithField("BinaryType", execData.BinaryType).WithFields(logF).Error("exec info")
-
-	// we will handle pause first
-	if execData.BinaryType == "pause" {
-		shimLog.WithFields(logF).Error("type is PAUSE")
-		return &Command{cmdString: "echo PAUSE", container: container, id: container.id, stdin: container.stdin, stdout: container.stdout, stderr: container.stderr, bundle: container.bundle, exec: newCmd}
-	}
-
-	if execData.BinaryType == "hvt" {
-		// do hvt stuff
-
 	}
 	return &Command{cmdString: cmdString, container: container, id: container.id, stdin: container.stdin, stdout: container.stdout, stderr: container.stderr, bundle: container.bundle, exec: newCmd}
 }
@@ -173,79 +194,3 @@ func (c *Command) WaitTest() error {
 
 	return nil
 }
-
-// c.status = task.StatusRunning
-// 	shimLog.WithField("c.status", c.status).WithFields(logF).Error("cs/start.go/startContainer")
-
-// 	stdin, stdout, stderr, err := s.sandbox.IOStream(c.id, c.id)
-// 	if err != nil {
-// 		return err
-// 	}
-
-// 	c.stdinPipe = stdin
-
-// 	if c.stdin != "" || c.stdout != "" || c.stderr != "" {
-// 		tty, err := newTtyIO(ctx, c.stdin, c.stdout, c.stderr, c.terminal)
-// 		if err != nil {
-// 			return err
-// 		}
-// 		c.ttyio = tty
-
-// 		go ioCopy(shimLog.WithField("container", c.id), c.exitIOch, c.stdinCloser, tty, stdin, stdout, stderr)
-
-// type Ccontainer struct {
-// 	s           *service
-// 	ttyio       *ttyIO
-// 	spec        *specs.Spec
-// 	exitTime    time.Time
-// 	execs       map[string]*exec
-// 	exitIOch    chan struct{}
-// 	stdinPipe   io.WriteCloser
-// 	stdinCloser chan struct{}
-// 	exitCh      chan uint32
-// 	id          string
-// 	stdin       string
-// 	stdout      string
-// 	stderr      string
-// 	bundle      string
-// 	cType       vc.ContainerType
-// 	exit        uint32
-// 	status      task.Status
-// 	terminal    bool
-// 	mounted     bool
-// }
-
-// type cmdExec struct {
-// 	container *container
-// 	cmds      *types.Cmd
-// 	tty       *tty
-// 	ttyio     *ttyIO
-
-// 	stdinPipe io.WriteCloser
-
-// 	exitTime time.Time
-
-// 	exitIOch    chan struct{}
-// 	stdinCloser chan struct{}
-
-// 	exitCh chan uint32
-
-// 	id string
-
-// 	exitCode int32
-
-// 	status task.Status
-// }
-
-// type cmdTty struct {
-// 	stdin    string
-// 	stdout   string
-// 	stderr   string
-// 	height   uint32
-// 	width    uint32
-// 	terminal bool
-// }
-
-// func test() {
-// 	osexec.Command("ls")
-// }
