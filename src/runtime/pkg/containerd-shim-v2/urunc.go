@@ -28,7 +28,7 @@ type Command struct {
 func CmdLine(execData virtcontainers.ExecData) string {
 	switch execData.BinaryType {
 	case "pause":
-		return "sleep infinity"
+		return execData.BinaryType
 	case "hvt":
 		return HvtCmd(execData)
 	case "qemu":
