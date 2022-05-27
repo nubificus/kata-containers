@@ -82,8 +82,14 @@ func startContainer(ctx context.Context, s *service, c *container) (retErr error
 		shimLog.WithFields(logF).WithField("ip", s.sandbox.Agent().GetExecData().IPAddress).Error("net info")
 
 		// here we create the command, perhaps I need to move it down (?)
-		cmd = CreateCommand(s.sandbox.Agent().GetExecData(), c)
+		if s.sandbox.Agent().GetExecData().BinaryType == "pause" {
+			//
+			PauseCommand(s.sandbox.Agent().GetExecData(), c)
+		} else {
+			cmd = CreateCommand(s.sandbox.Agent().GetExecData(), c)
+		}
 		unikernelCreated = true
+
 		shimLog.WithField("cmd.id", cmd.id).WithField("c.bundle", c.bundle).WithFields(logF).Error("info")
 	}
 
@@ -125,7 +131,7 @@ func startContainer(ctx context.Context, s *service, c *container) (retErr error
 		shimLog.WithError(err).Warn("Failed to run post-start hooks")
 	}
 
-	if unikernelCreated {
+	if unikernelCreated && s.sandbox.Agent().GetExecData().BinaryType != "pause" {
 		shimLog.WithFields(logF).Error("ready to start unikernel")
 		shimLog.WithField("unikPath", cmd.cmdString).WithFields(logF).Error("letsgo")
 		err := cmd.SetIO(ctx)
@@ -147,6 +153,9 @@ func startContainer(ctx context.Context, s *service, c *container) (retErr error
 		// ananos' diff
 		// go wait(ctx, s, c, "")
 		// return nil
+
+	} else if s.sandbox.Agent().GetExecData().BinaryType != "pause" {
+		return nil
 
 	} else {
 		c.status = task.StatusRunning

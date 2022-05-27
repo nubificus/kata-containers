@@ -79,6 +79,11 @@ func CreateCommand(execData virtcontainers.ExecData, container *container) *Comm
 	return &Command{cmdString: cmdString, container: container, id: container.id, stdin: container.stdin, stdout: container.stdout, stderr: container.stderr, bundle: container.bundle, exec: newCmd}
 }
 
+func PauseCommand(execData virtcontainers.ExecData, container *container) {
+	container.status = task.StatusRunning
+	osexec.Command(execData.BinaryPath).Start()
+}
+
 func (c *Command) Run() {
 	c.container.status = task.StatusRunning
 	logF := logrus.Fields{"src": "uruncio", "file": "cs/urunc.go", "func": "Run"}
