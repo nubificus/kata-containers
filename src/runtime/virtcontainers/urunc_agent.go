@@ -31,6 +31,7 @@ type ExecData struct {
 	BinaryPath string
 	IPAddress  string
 	Mask       string
+	Tap        string
 	Container  *Container
 }
 
@@ -50,6 +51,7 @@ func newExecData() ExecData {
 		BinaryPath: "",
 		IPAddress:  "",
 		Mask:       "",
+		Tap:        "",
 	}
 }
 
@@ -105,18 +107,22 @@ func (u *uruncAgent) startSandbox(ctx context.Context, sandbox *Sandbox) error {
 	interfaces, _, _, err := generateVCNetworkStructures(ctx, sandbox.network)
 	// interfaces, routes, neighs, err := generateVCNetworkStructures(ctx, sandbox.network)
 	if err != nil {
-		return err
+		u.Logger().WithFields(logF).WithField("errmsg", err.Error()).Error("IP error...")
 	}
-	// u.Logger().WithFields(logF).WithField("interfaces", interfaces).Error("createContainer 4")
-	//msg="createContainer 4" interfaces="[&Interface{Device:eth0,Name:eth0,IPAddresses:[]*IPAddress{&IPAddress{Family:v4,Address:10.4.0.20,Mask:24,XXX_unrecognized:[],},&IPAddress{Family:v6,Address:fe80::9c89:5ff:feb5:86d5,Mask:64,XXX_unrecognized:[],},},Mtu:1500,HwAddr:9e:89:05:b5:86:d5,PciPath:,Type:,RawFlags:0,XXX_unrecognized:[],}]" name=containerd-shim-v2 pid=1371845 sandbox=c06d6ba018f0036de74eb529263801b5ea7c611384478d9ecf5385992e4c9edd source=virtcontainers subsystem=mock_agent
-	IPAddress := interfaces[0].IPAddresses[0].Address
-	mask := interfaces[0].IPAddresses[0].Mask
-	u.Logger().WithFields(logF).WithField("IPAddress", IPAddress).Error("createContainer 4.5")
-	u.Logger().WithFields(logF).WithField("mask", mask).Error("createContainer 4.5")
-	// u.Logger().WithFields(logF).WithField("routes", routes).Error("createContainer 4.5")
-	// u.Logger().WithFields(logF).WithField("neighs", neighs).Error("createContainer 4.5")
-	u.ExecData.IPAddress = IPAddress
-	u.ExecData.Mask = mask
+	if len(interfaces) == 1 {
+		IPAddress := interfaces[0].IPAddresses[0].Address
+		mask := interfaces[0].IPAddresses[0].Mask
+		tap := interfaces[0].Device
+		u.ExecData.IPAddress = IPAddress
+		u.ExecData.Mask = mask
+		u.ExecData.Tap = tap
+		u.Logger().WithFields(logF).WithField("IPAddress", IPAddress).Error("createContainer 4.5")
+		u.Logger().WithFields(logF).WithField("mask", mask).Error("createContainer 4.5")
+		u.Logger().WithFields(logF).WithField("device", tap).Error("createContainer 4.5")
+		u.Logger().WithFields(logF).WithField("name", interfaces[0].Name).Error("createContainer 4.5")
+	} else {
+		u.Logger().WithFields(logF).WithField("interfaces", len(interfaces)).Error("Network fail")
+	}
 	return nil
 }
 
@@ -139,21 +145,20 @@ func (u *uruncAgent) createContainer(ctx context.Context, sandbox *Sandbox, c *C
 		if err != nil {
 			u.Logger().WithFields(logF).WithField("errmsg", err.Error()).Error("IP error...")
 		}
-		u.Logger().WithFields(logF).Error("IP generated...")
-
-		u.Logger().WithFields(logF).WithField("interfaces", len(interfaces)).Error("IP1")
-		// interfaces is 0
-		u.Logger().WithFields(logF).WithField("IPAddresses", len(interfaces[0].IPAddresses)).Error("IP2")
-		IPAddress := interfaces[0].IPAddresses[0].Address
-
-		u.Logger().WithFields(logF).Error("IP found...")
-		mask := interfaces[0].IPAddresses[0].Mask
-		u.Logger().WithFields(logF).Error("Mask found...")
-
-		u.Logger().WithFields(logF).WithField("IPAddress", IPAddress).Error("createContainer 4.5")
-		u.Logger().WithFields(logF).WithField("mask", mask).Error("createContainer 4.5")
-		u.ExecData.IPAddress = IPAddress
-		u.ExecData.Mask = mask
+		if len(interfaces) == 1 {
+			IPAddress := interfaces[0].IPAddresses[0].Address
+			mask := interfaces[0].IPAddresses[0].Mask
+			tap := interfaces[0].Device
+			u.ExecData.IPAddress = IPAddress
+			u.ExecData.Mask = mask
+			u.ExecData.Tap = tap
+			u.Logger().WithFields(logF).WithField("IPAddress", IPAddress).Error("createContainer 4.5")
+			u.Logger().WithFields(logF).WithField("mask", mask).Error("createContainer 4.5")
+			u.Logger().WithFields(logF).WithField("device", tap).Error("createContainer 4.5")
+			u.Logger().WithFields(logF).WithField("name", interfaces[0].Name).Error("createContainer 4.5")
+		} else {
+			u.Logger().WithFields(logF).WithField("interfaces", len(interfaces)).Error("Network fail")
+		}
 	}
 	u.Logger().WithFields(logF).WithField("IPADDR", u.ExecData.IPAddress).Error("IPADDR")
 
@@ -183,13 +188,17 @@ func (u *uruncAgent) createContainer(ctx context.Context, sandbox *Sandbox, c *C
 		u.Logger().WithFields(logF).WithField("out", string(ls2Out)).Error("ls 2 OK")
 	}
 
+	// This needs to change to the cwd path. the default ns is not used.
+	// rootFsPath := "/run/containerd/io.containerd.runtime.v2.task/default/" + c.id + "/" + c.rootfsSuffix
+
+	cwdPath = strings.ReplaceAll(cwdPath, " ", "")
+	cwdPath = strings.TrimSpace(cwdPath)
+	rootFsPath := cwdPath + c.id + "/" + c.rootfsSuffix
+	u.Logger().WithFields(logF).WithField("rootFsPath", rootFsPath).Error("")
+
 	// we need to check if is devmapper or not.
 	// if c.rootFs.Source is "", then no devmapper.
 	// if c.rootFs.Source is "/dev/dm-*", then we need to mount the block device
-
-	rootFsPath := "/run/containerd/io.containerd.runtime.v2.task/default/" + c.id + "/" + c.rootfsSuffix
-	u.Logger().WithFields(logF).WithField("rootFsPath", rootFsPath).Error("")
-
 	if c.rootFs.Source != "" {
 		u.Logger().WithFields(logF).Error("Devmapper")
 
@@ -254,8 +263,11 @@ func (u *uruncAgent) createContainer(ctx context.Context, sandbox *Sandbox, c *C
 		if strings.Contains(lsResult, ".hvt") {
 			u.ExecData.BinaryType = "hvt"
 			u.ExecData.BinaryPath = rootFsPath + "/unikernel/" + lsResult
+		} else if strings.Contains(lsResult, ".qm") {
+			u.ExecData.BinaryType = "qemu"
+			u.ExecData.BinaryPath = rootFsPath + "/unikernel/" + lsResult
 		} else {
-			u.ExecData.BinaryType = "unikernel"
+			u.ExecData.BinaryType = "binary"
 			u.ExecData.BinaryPath = rootFsPath + "/unikernel/" + lsResult
 		}
 	}
@@ -288,7 +300,16 @@ func (u *uruncAgent) stopContainer(ctx context.Context, sandbox *Sandbox, c Cont
 
 	rootfsGuestPath := filepath.Join(kataGuestSharedDir(), c.id, c.rootfsSuffix)
 	u.Logger().WithFields(logF).WithField("rootfsGuestPath", rootfsGuestPath).Error("createContainer 2")
-	rootFsPath := "/run/containerd/io.containerd.runtime.v2.task/default/" + c.id + "/" + c.rootfsSuffix
+
+	// rootFsPath := "/run/containerd/io.containerd.runtime.v2.task/default/" + c.id + "/" + c.rootfsSuffix
+	// This needs to change to the cwd path. the default ns is not used.
+	// rootFsPath := "/run/containerd/io.containerd.runtime.v2.task/default/" + c.id + "/" + c.rootfsSuffix
+
+	cwdPath, _ := os.Getwd()
+	cwdPath = strings.ReplaceAll(cwdPath, " ", "")
+	cwdPath = strings.TrimSpace(cwdPath)
+	rootFsPath := cwdPath + c.id + "/" + c.rootfsSuffix
+	u.Logger().WithFields(logF).WithField("rootFsPath", rootFsPath).Error("")
 
 	if rootfsSourcePath != "" {
 
