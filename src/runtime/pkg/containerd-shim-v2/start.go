@@ -90,7 +90,6 @@ func startContainer(ctx context.Context, s *service, c *container) (retErr error
 		}
 		unikernelCreated = true
 
-		shimLog.WithField("cmd.id", cmd.id).WithField("c.bundle", c.bundle).WithFields(logF).Error("info")
 	}
 
 	// If the hypervisor is not urunc, execute the normal flow
