@@ -154,8 +154,8 @@ func startContainer(ctx context.Context, s *service, c *container) (retErr error
 		// go wait(ctx, s, c, "")
 		// return nil
 
-	} else if s.sandbox.Agent().GetExecData().BinaryType != "pause" {
-		return nil
+		// } else if s.sandbox.Agent().GetExecData().BinaryType != "pause" {
+		// 	return nil
 
 	} else {
 		c.status = task.StatusRunning
