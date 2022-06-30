@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/containerd/containerd/events"
+	"github.com/sirupsen/logrus"
 )
 
 type forwarderType string
@@ -54,6 +55,8 @@ type containerdForwarder struct {
 }
 
 func (cf *containerdForwarder) forward() {
+	logF := logrus.Fields{"src": "uruncio", "file": "cs/events_forwarder.go", "func": "containerdForwarder.forward"}
+	shimLog.WithFields(logF).Error("containerdForwarder")
 	for e := range cf.s.events {
 		ctx, cancel := context.WithTimeout(cf.ctx, timeOut)
 		err := cf.publisher.Publish(ctx, getTopic(e), e)
@@ -61,6 +64,8 @@ func (cf *containerdForwarder) forward() {
 		if err != nil {
 			shimLog.WithError(err).Error("post event")
 		}
+		shimLog.WithFields(logF).WithField("e", e).WithField("topic", getTopic(e)).Error("containerdForwarder")
+
 	}
 }
 

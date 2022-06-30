@@ -26,14 +26,29 @@ type Command struct {
 }
 
 func CmdLine(execData virtcontainers.ExecData) string {
+
+	// BinaryType string
+	// BinaryPath string
+	// IPAddress  string
+	// Mask       string
+	// Tap        string
+	// Container  *Container
+	logF := logrus.Fields{"src": "uruncio", "file": "cs/urunc.go", "func": "CmdLine"}
+	shimLog.WithField("BinaryType", execData.BinaryType).WithFields(logF).Error("ExecData")
+	shimLog.WithField("BinaryPath", execData.BinaryPath).WithFields(logF).Error("ExecData")
+	shimLog.WithField("IPAddress", execData.IPAddress).WithFields(logF).Error("ExecData")
+	shimLog.WithField("Mask", execData.Mask).WithFields(logF).Error("ExecData")
+	shimLog.WithField("Tap", execData.Tap).WithFields(logF).Error("ExecData")
+	shimLog.WithField("Container", execData.Container.ID()).WithFields(logF).Error("ExecData")
+
 	switch execData.BinaryType {
 	case "pause":
-		return execData.BinaryType
+		return execData.BinaryPath
 	case "hvt":
 		return HvtCmd(execData)
 	case "qemu":
 		return QemuCmd(execData)
-	case " binary":
+	case "binary":
 		return execData.BinaryPath
 	default:
 		return ""
@@ -46,6 +61,17 @@ func HvtCmd(execData virtcontainers.ExecData) string {
 }
 
 func QemuCmd(execData virtcontainers.ExecData) string {
+	qemuCmd := "qemu-system-x86_64 -cpu host"
+	qemuCmd += " -enable-kvm"
+	qemuCmd += " -m 128"
+	qemuCmd += " -nodefaults -no-acpi "
+	qemuCmd += " -display none -serial stdio "
+	qemuCmd += " -device isa-debug-exit "
+	qemuCmd += " -net nic,model=virtio "
+	qemuCmd += " -net tap,script=no,ifname=" + execData.Tap
+	qemuCmd += " -kernel " + execData.BinaryPath
+	qemuCmd += " -append \"netdev.ipv4_addr=" + execData.IPAddress + "netdev.ipv4_gw_addr=" + execData.Gateway + " netdev.ipv4_subnet_mask=255.255.255.255 --"
+
 	// qemu-system-x86_64 \
 	//     -cpu host \
 	//     -enable-kvm \
@@ -57,7 +83,7 @@ func QemuCmd(execData virtcontainers.ExecData) string {
 	//     -net tap,script=no,ifname=tap106 \
 	//     -kernel /app-helloworld_kvm-x86_64 \
 	//     -append "netdev.ipv4_addr=$IP netdev.ipv4_gw_addr=169.254.1.1 netdev.ipv4_subnet_mask=255.255.255.255 --"
-	return ""
+	return qemuCmd
 
 }
 

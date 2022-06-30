@@ -174,21 +174,28 @@ func newCommand(ctx context.Context, id, containerdBinary, containerdAddress str
 		Setpgid: true,
 	}
 
+	shimLog.WithField("src", "uruncio").WithField("cmd", "logio").Error(cmd.Path)
+
 	return cmd, nil
 }
 
 // StartShim is a binary call that starts a kata shimv2 service which will
 // implement the ShimV2 APIs such as create/start/update etc containers.
 func (s *service) StartShim(ctx context.Context, opts cdshim.StartOpts) (_ string, retErr error) {
+	logF := logrus.Fields{"src": "uruncio", "file": "cs/service.go", "func": "StartShim"}
+	shimLog.WithFields(logF).Error("")
 	bundlePath, err := os.Getwd()
 	if err != nil {
 		return "", err
 	}
+	shimLog.WithFields(logF).WithField("bundlePath", bundlePath).Error("")
 
 	address, err := getAddress(ctx, bundlePath, opts.Address, opts.ID)
 	if err != nil {
 		return "", err
 	}
+	shimLog.WithFields(logF).WithField("address", address).Error("")
+
 	if address != "" {
 		if err := cdshim.WriteAddress("address", address); err != nil {
 			return "", err
@@ -200,6 +207,8 @@ func (s *service) StartShim(ctx context.Context, opts cdshim.StartOpts) (_ strin
 	if err != nil {
 		return "", err
 	}
+	shimLog.WithFields(logF).WithField("ContainerdBinary", opts.ContainerdBinary).Error("")
+	shimLog.WithFields(logF).WithField("Address", opts.Address).Error("")
 
 	address, err = cdshim.SocketAddress(ctx, opts.Address, opts.ID)
 	if err != nil {
@@ -242,6 +251,8 @@ func (s *service) StartShim(ctx context.Context, opts cdshim.StartOpts) (_ strin
 			cmd.Process.Kill()
 		}
 	}()
+
+	shimLog.WithFields(logF).WithField("shim.pid", cmd.Process.Pid).Error("")
 
 	if err = cdshim.WritePidFile("shim.pid", cmd.Process.Pid); err != nil {
 		return "", err

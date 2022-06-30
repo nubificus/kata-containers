@@ -32,6 +32,7 @@ type ExecData struct {
 	IPAddress  string
 	Mask       string
 	Tap        string
+	Gateway    string
 	Container  *Container
 }
 
@@ -51,6 +52,7 @@ func newExecData() ExecData {
 		BinaryPath: "",
 		IPAddress:  "",
 		Mask:       "",
+		Gateway:    "",
 		Tap:        "",
 	}
 }
@@ -103,31 +105,49 @@ func (u *uruncAgent) exec(ctx context.Context, sandbox *Sandbox, c Container, cm
 // startSandbox is the Noop agent Sandbox starting implementatiou. It does nothing.
 func (u *uruncAgent) startSandbox(ctx context.Context, sandbox *Sandbox) error {
 	logF := logrus.Fields{"src": "uruncio", "file": "vc/urunc_agent.go", "func": "startSandbox"}
-
-	interfaces, _, _, err := generateVCNetworkStructures(ctx, sandbox.network)
-	// interfaces, routes, neighs, err := generateVCNetworkStructures(ctx, sandbox.network)
-	if err != nil {
-		u.Logger().WithFields(logF).WithField("errmsg", err.Error()).Error("IP error...")
-	}
-	if len(interfaces) == 1 {
-		IPAddress := interfaces[0].IPAddresses[0].Address
-		mask := interfaces[0].IPAddresses[0].Mask
-		tap := interfaces[0].Device
-		u.ExecData.IPAddress = IPAddress
-		u.ExecData.Mask = mask
-		u.ExecData.Tap = tap
-		u.Logger().WithFields(logF).WithField("IPAddress", IPAddress).Error("createContainer 4.5")
-		u.Logger().WithFields(logF).WithField("mask", mask).Error("createContainer 4.5")
-		u.Logger().WithFields(logF).WithField("device", tap).Error("createContainer 4.5")
-		u.Logger().WithFields(logF).WithField("name", interfaces[0].Name).Error("createContainer 4.5")
-	} else {
-		u.Logger().WithFields(logF).WithField("interfaces", len(interfaces)).Error("Network fail")
-	}
+	u.Logger().WithFields(logF).Error("startSandbox")
+	u.addNetworkData(ctx, sandbox)
 	return nil
 }
 
 // stopSandbox is the Noop agent Sandbox stopping implementatiou. It does nothing.
 func (u *uruncAgent) stopSandbox(ctx context.Context, sandbox *Sandbox) error {
+	return nil
+}
+
+func (u *uruncAgent) addNetworkData(ctx context.Context, sandbox *Sandbox) error {
+	logF := logrus.Fields{"src": "uruncio", "file": "vc/urunc_agent.go", "func": "addNetworkData"}
+
+	if u.ExecData.IPAddress == "" {
+		u.Logger().WithFields(logF).Error("IP empty, generating...")
+		interfaces, routes, _, err := generateVCNetworkStructures(ctx, sandbox.network)
+		// interfaces, routes, neighs, err := generateVCNetworkStructures(ctx, sandbox.network)
+		if err != nil {
+			u.Logger().WithFields(logF).WithField("errmsg", err.Error()).Error("IP error...")
+			return err
+		}
+		u.Logger().WithFields(logF).WithField("interfaces", len(interfaces)).Error("LENS")
+		u.Logger().WithFields(logF).WithField("routes", len(routes)).Error("LENS")
+
+		if len(interfaces) == 1 && len(routes) == 1 {
+			IPAddress := interfaces[0].IPAddresses[0].Address
+			mask := interfaces[0].IPAddresses[0].Mask
+			tap := interfaces[0].Device
+			gw := routes[0].Gateway
+			u.ExecData.IPAddress = IPAddress
+			u.ExecData.Mask = mask
+			u.ExecData.Tap = tap
+			u.ExecData.Gateway = gw
+			u.Logger().WithFields(logF).WithField("IPAddress", IPAddress).Error("addNetworkData 4.5")
+			u.Logger().WithFields(logF).WithField("mask", mask).Error("addNetworkData 4.5")
+			u.Logger().WithFields(logF).WithField("device", tap).Error("addNetworkData 4.5")
+			u.Logger().WithFields(logF).WithField("name", interfaces[0].Name).Error("addNetworkData 4.5")
+			u.Logger().WithFields(logF).WithField("gw", gw).Error("addNetworkData 4.5")
+		} else {
+			u.Logger().WithFields(logF).WithField("interfaces", len(interfaces)).Error("Network fail")
+		}
+	}
+	u.Logger().WithFields(logF).WithField("IPADDR", u.ExecData.IPAddress).Error("IPADDR")
 	return nil
 }
 
@@ -137,29 +157,7 @@ func (u *uruncAgent) createContainer(ctx context.Context, sandbox *Sandbox, c *C
 
 	u.ExecData.Container = c
 
-	if u.ExecData.IPAddress == "" {
-		u.Logger().WithFields(logF).Error("IP empty, generating...")
-
-		interfaces, _, _, err := generateVCNetworkStructures(ctx, sandbox.network)
-		// interfaces, routes, neighs, err := generateVCNetworkStructures(ctx, sandbox.network)
-		if err != nil {
-			u.Logger().WithFields(logF).WithField("errmsg", err.Error()).Error("IP error...")
-		}
-		if len(interfaces) == 1 {
-			IPAddress := interfaces[0].IPAddresses[0].Address
-			mask := interfaces[0].IPAddresses[0].Mask
-			tap := interfaces[0].Device
-			u.ExecData.IPAddress = IPAddress
-			u.ExecData.Mask = mask
-			u.ExecData.Tap = tap
-			u.Logger().WithFields(logF).WithField("IPAddress", IPAddress).Error("createContainer 4.5")
-			u.Logger().WithFields(logF).WithField("mask", mask).Error("createContainer 4.5")
-			u.Logger().WithFields(logF).WithField("device", tap).Error("createContainer 4.5")
-			u.Logger().WithFields(logF).WithField("name", interfaces[0].Name).Error("createContainer 4.5")
-		} else {
-			u.Logger().WithFields(logF).WithField("interfaces", len(interfaces)).Error("Network fail")
-		}
-	}
+	u.addNetworkData(ctx, sandbox)
 	u.Logger().WithFields(logF).WithField("IPADDR", u.ExecData.IPAddress).Error("IPADDR")
 
 	// first lets get some data to better understand the process.

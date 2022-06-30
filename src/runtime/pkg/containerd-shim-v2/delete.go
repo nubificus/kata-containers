@@ -12,11 +12,19 @@ import (
 	"github.com/containerd/containerd/api/types/task"
 	"github.com/containerd/containerd/mount"
 	"github.com/kata-containers/kata-containers/src/runtime/pkg/katautils"
+	"github.com/sirupsen/logrus"
 )
 
 func deleteContainer(ctx context.Context, s *service, c *container) error {
+	logF := logrus.Fields{"src": "uruncio", "file": "cs/delete.go", "func": "deleteContainer"}
+	shimLog.WithFields(logF).Error("delete started")
+
 	if !c.cType.IsSandbox() {
+		shimLog.WithField("cType", "not sandbox").WithFields(logF).Error("")
+
 		if c.status != task.StatusStopped {
+			shimLog.WithField("cStatus", "not stopped").WithFields(logF).Error("")
+
 			if _, err := s.sandbox.StopContainer(ctx, c.id, false); err != nil && !isNotFound(err) {
 				return err
 			}
@@ -35,6 +43,8 @@ func deleteContainer(ctx context.Context, s *service, c *container) error {
 	}
 
 	if c.mounted {
+		shimLog.WithField("c.mounted", "true").WithFields(logF).Error("")
+
 		rootfs := path.Join(c.bundle, "rootfs")
 		if err := mount.UnmountAll(rootfs, 0); err != nil {
 			shimLog.WithError(err).Warn("failed to cleanup rootfs mount")
@@ -42,6 +52,7 @@ func deleteContainer(ctx context.Context, s *service, c *container) error {
 	}
 
 	delete(s.containers, c.id)
+	shimLog.WithFields(logF).Error("delete completed")
 
 	return nil
 }
