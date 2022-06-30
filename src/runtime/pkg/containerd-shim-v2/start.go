@@ -62,41 +62,34 @@ func startContainer(ctx context.Context, s *service, c *container) (retErr error
 	if s.config.HypervisorConfig.Unikernel && binaryType == "" {
 		return errors.New("unikernel not found in rootfs")
 	}
-	if s.config.HypervisorConfig.Unikernel {
-		unikernelFile := s.sandbox.Agent().GetExecData().BinaryPath
-		shimLog.WithField("unikernelFile", unikernelFile).WithFields(logF).Error("is unikernel and is sandbox")
-		if c.cType.IsSandbox() {
-			shimLog.WithFields(logF).Error("starting sandbox")
-			s.sandbox.Start(ctx)
-			shimLog.WithFields(logF).Error("sandbox started")
-		}
-
-		shimLog.WithFields(logF).Error("starting container")
-
-		_, err := s.sandbox.StartContainer(ctx, c.id+"-unikernel")
-		if err != nil {
-			return err
-		}
-		shimLog.WithFields(logF).Error("container started")
-
-		shimLog.WithFields(logF).WithField("ip", s.sandbox.Agent().GetExecData().IPAddress).Error("net info")
-
-		// here we create the command, perhaps I need to move it down (?)
-		if s.sandbox.Agent().GetExecData().BinaryType == "pause" {
-			//
-			PauseCommand(s.sandbox.Agent().GetExecData(), c)
-		} else {
-			cmd = CreateCommand(s.sandbox.Agent().GetExecData(), c)
-		}
-		unikernelCreated = true
-
-	}
 
 	// If the hypervisor is not urunc, execute the normal flow
-	if !s.config.HypervisorConfig.Unikernel {
-		if c.cType.IsSandbox() {
-			shimLog.WithField("cType", c.cType).WithFields(logF).Error("start unikernel exec")
+	if c.cType.IsSandbox() {
 
+		if s.config.HypervisorConfig.Unikernel {
+			unikernelFile := s.sandbox.Agent().GetExecData().BinaryPath
+			shimLog.WithField("unikernelFile", unikernelFile).WithFields(logF).Error("is unikernel and is sandbox")
+			if c.cType.IsSandbox() {
+				shimLog.WithFields(logF).Error("starting sandbox")
+				s.sandbox.Start(ctx)
+				shimLog.WithFields(logF).Error("sandbox started")
+			}
+
+			shimLog.WithFields(logF).Error("starting container")
+
+			_, err := s.sandbox.StartContainer(ctx, c.id+"-unikernel")
+			if err != nil {
+				return err
+			}
+			shimLog.WithFields(logF).Error("container started")
+
+			shimLog.WithFields(logF).WithField("ip", s.sandbox.Agent().GetExecData().IPAddress).Error("net info")
+
+			unikernelCreated = true
+		} else {
+
+			shimLog.WithField("cType", c.cType).WithFields(logF).Error("start unikernel exec")
+                
 			err := s.sandbox.Start(ctx)
 			if err != nil {
 				return err
@@ -107,16 +100,42 @@ func startContainer(ctx context.Context, s *service, c *container) (retErr error
 				return err
 			}
 			go watchSandbox(ctx, s)
-
+                
 			// We use s.ctx(`ctx` derived from `s.ctx`) to check for cancellation of the
 			// shim context and the context passed to startContainer for tracing.
 			go watchOOMEvents(ctx, s)
+		}
+	} else {
+
+		if s.config.HypervisorConfig.Unikernel {
+			unikernelFile := s.sandbox.Agent().GetExecData().BinaryPath
+			shimLog.WithField("unikernelFile", unikernelFile).WithFields(logF).Error("is unikernel and is sandbox")
+			if c.cType.IsSandbox() {
+				shimLog.WithFields(logF).Error("starting sandbox")
+				s.sandbox.Start(ctx)
+				shimLog.WithFields(logF).Error("sandbox started")
+			}
+
+			shimLog.WithFields(logF).Error("starting container")
+
+			_, err := s.sandbox.StartContainer(ctx, c.id+"-unikernel")
+			if err != nil {
+				return err
+			}
+			shimLog.WithFields(logF).Error("container started")
+
+			shimLog.WithFields(logF).WithField("ip", s.sandbox.Agent().GetExecData().IPAddress).Error("net info")
+
+			unikernelCreated = true
 		} else {
+
 			_, err := s.sandbox.StartContainer(ctx, c.id)
 			if err != nil {
 				return err
 			}
+
 		}
+
 	}
 
 	// Run post-start OCI hooks.
@@ -130,9 +149,12 @@ func startContainer(ctx context.Context, s *service, c *container) (retErr error
 		shimLog.WithError(err).Warn("Failed to run post-start hooks")
 	}
 
-	if unikernelCreated && s.sandbox.Agent().GetExecData().BinaryType != "pause" {
+	if unikernelCreated {
 		shimLog.WithFields(logF).Error("ready to start unikernel")
-		shimLog.WithField("unikPath", cmd.cmdString).WithFields(logF).Error("letsgo")
+
+	        cmd = CreateCommand(s.sandbox.Agent().GetExecData(), c)
+
+		//shimLog.WithField("unikPath", cmd.cmdString).WithFields(logF).Error("letsgo")
 		err := cmd.SetIO(ctx)
 		if err != nil {
 			return err
@@ -154,7 +176,7 @@ func startContainer(ctx context.Context, s *service, c *container) (retErr error
 		// return nil
 
 		// } else if s.sandbox.Agent().GetExecData().BinaryType != "pause" {
-		// 	return nil
+		//return nil
 
 	} else {
 		c.status = task.StatusRunning
