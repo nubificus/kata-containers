@@ -105,20 +105,6 @@ func CreateCommand(execData virtcontainers.ExecData, container *container) *Comm
 	return &Command{cmdString: cmdString, container: container, id: container.id, stdin: container.stdin, stdout: container.stdout, stderr: container.stderr, bundle: container.bundle, exec: newCmd}
 }
 
-func PauseCommand(execData virtcontainers.ExecData, container *container) {
-	container.status = task.StatusRunning
-	osexec.Command(execData.BinaryPath).Start()
-}
-
-func (c *Command) Run() {
-	c.container.status = task.StatusRunning
-	logF := logrus.Fields{"src": "uruncio", "file": "cs/urunc.go", "func": "Run"}
-	shimLog.WithField("containerType", c.container.cType).WithFields(logF).Error("container info")
-	cmdF := logrus.Fields{"id": c.id, "stdin": c.stdin, "stdout": c.stdout, "stderr": c.stderr}
-	shimLog.WithFields(cmdF).WithFields(logF).Error("cmd info")
-	osexec.Command(c.cmdString)
-}
-
 func (c *Command) ioPipes() (io.WriteCloser, io.ReadCloser, io.ReadCloser, error) {
 	stdin, err := c.exec.StdinPipe()
 	if err != nil {
@@ -191,37 +177,5 @@ func (c *Command) Wait() error {
 
 	c.container.status = task.StatusStopped
 	shimLog.WithFields(logF).Error("container.status: StatusStopped")
-	return nil
-}
-
-func (c *Command) WaitTest() error {
-	logF := logrus.Fields{"src": "uruncio", "file": "cs/urunc.go", "func": "WaitTest"}
-	shimLog.WithFields(logF).WithField("path", c.exec.Path).Error("running cmd")
-	go func() {
-		shimLog.WithFields(logF).Error("sleep ended")
-		c.exec.Start()
-	}()
-
-	go func() {
-		// [TODO] check if sleep is needed, remove if not
-		time.Sleep(500 * time.Millisecond)
-
-		c.exec.Wait()
-		shimLog.WithFields(logF).Error("exec returned")
-
-		shimLog.WithFields(logF).Error("cmd completed")
-
-		// ananos' diff
-		// close(c.container.exitIOch)
-		// shimLog.WithFields(logF).Error("exitIOch closed")
-
-		// ananos' diff
-		// close(c.container.stdinCloser)
-		// shimLog.WithFields(logF).Error("stdinCloser closed")
-
-		c.container.status = task.StatusStopped
-		shimLog.WithFields(logF).Error("container.status: StatusStopped")
-	}()
-
 	return nil
 }

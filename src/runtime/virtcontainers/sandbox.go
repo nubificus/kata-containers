@@ -513,6 +513,8 @@ func (s *Sandbox) getAndStoreGuestDetails(ctx context.Context) error {
 // to physically create that sandbox i.e. starts a VM for that sandbox to eventually
 // be started.
 func createSandbox(ctx context.Context, sandboxConfig SandboxConfig, factory Factory) (*Sandbox, error) {
+	logF := logrus.Fields{"src": "uruncio", "file": "vc/sandbox.go", "func": "createSandbox"}
+	logrus.WithFields(logF).Error("")
 	span, ctx := katatrace.Trace(ctx, nil, "createSandbox", sandboxTracingTags, map[string]string{"sandbox_id": sandboxConfig.ID})
 	defer span.End()
 
@@ -524,7 +526,7 @@ func createSandbox(ctx context.Context, sandboxConfig SandboxConfig, factory Fac
 	if err != nil {
 		return nil, err
 	}
-
+	logrus.WithFields(logF).Error("Sandbox created from Hypervisor")
 	if len(s.config.Experimental) != 0 {
 		s.Logger().WithField("features", s.config.Experimental).Infof("Enable experimental features")
 	}
@@ -547,11 +549,13 @@ func createSandbox(ctx context.Context, sandboxConfig SandboxConfig, factory Fac
 	if err := s.agent.createSandbox(ctx, s); err != nil {
 		return nil, err
 	}
+	logrus.WithFields(logF).Error("Sandbox created from Agent")
 
 	// Set sandbox state
 	if err := s.setSandboxState(types.StateReady); err != nil {
 		return nil, err
 	}
+	logrus.WithFields(logF).Error("Sandbox state ready")
 
 	return s, nil
 }

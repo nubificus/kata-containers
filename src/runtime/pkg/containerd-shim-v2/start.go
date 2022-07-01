@@ -10,10 +10,9 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/sirupsen/logrus"
-
 	"github.com/containerd/containerd/api/types/task"
 	"github.com/kata-containers/kata-containers/src/runtime/pkg/katautils"
+	"github.com/sirupsen/logrus"
 )
 
 func startContainer(ctx context.Context, s *service, c *container) (retErr error) {
@@ -49,13 +48,17 @@ func startContainer(ctx context.Context, s *service, c *container) (retErr error
 	// start a container
 	// hopefully we can get the agent.ExecData field
 	execData := s.sandbox.Agent().GetExecData()
-	logrus.WithFields(logF).Error(execData.BinaryPath)
-	shimLog.WithFields(logF).WithField("BinaryPath", execData.BinaryPath).Error("container info")
-	shimLog.WithFields(logF).WithField("BinaryType", execData.BinaryType).Error("container info")
-	shimLog.WithField("containerType", c.cType).WithFields(logF).Error("container info")
-	shimLog.WithField("hyperVisorpid", s.hpid).WithFields(logF).Error("container info")
-	shimLog.WithField("shimpid", s.pid).WithFields(logF).Error("container info")
-	shimLog.WithField("hypervisorUnikernel", s.config.HypervisorConfig.Unikernel).WithFields(logF).Error("container info")
+	// logrus.WithFields(logF).Error(execData.BinaryPath)
+	shimLog.WithFields(logF).WithField("BinaryPath", execData.BinaryPath).Error("coninfo")
+	shimLog.WithFields(logF).WithField("BinaryType", execData.BinaryType).Error("coninfo")
+	shimLog.WithFields(logF).WithField("IPAddress", execData.IPAddress).Error("coninfo")
+	shimLog.WithFields(logF).WithField("Mask", execData.Mask).Error("coninfo")
+	shimLog.WithFields(logF).WithField("Gateway", execData.Gateway).Error("coninfo")
+	shimLog.WithFields(logF).WithField("Tap", execData.Tap).Error("coninfo")
+	shimLog.WithField("container type", c.cType).WithFields(logF).Error("coninfo")
+	shimLog.WithField("hyperVisorpid", s.hpid).WithFields(logF).Error("coninfo")
+	shimLog.WithField("shimpid", s.pid).WithFields(logF).Error("coninfo")
+	shimLog.WithField("hypervisorUnikernel", s.config.HypervisorConfig.Unikernel).WithFields(logF).Error("coninfo")
 
 	// Check if config has unikernel set to true and binary exists in rootfs
 	binaryType := s.sandbox.Agent().GetExecData().BinaryType
@@ -89,7 +92,7 @@ func startContainer(ctx context.Context, s *service, c *container) (retErr error
 		} else {
 
 			shimLog.WithField("cType", c.cType).WithFields(logF).Error("start unikernel exec")
-                
+
 			err := s.sandbox.Start(ctx)
 			if err != nil {
 				return err
@@ -100,7 +103,7 @@ func startContainer(ctx context.Context, s *service, c *container) (retErr error
 				return err
 			}
 			go watchSandbox(ctx, s)
-                
+
 			// We use s.ctx(`ctx` derived from `s.ctx`) to check for cancellation of the
 			// shim context and the context passed to startContainer for tracing.
 			go watchOOMEvents(ctx, s)
@@ -152,7 +155,7 @@ func startContainer(ctx context.Context, s *service, c *container) (retErr error
 	if unikernelCreated {
 		shimLog.WithFields(logF).Error("ready to start unikernel")
 
-	        cmd = CreateCommand(s.sandbox.Agent().GetExecData(), c)
+		cmd = CreateCommand(s.sandbox.Agent().GetExecData(), c)
 
 		//shimLog.WithField("unikPath", cmd.cmdString).WithFields(logF).Error("letsgo")
 		err := cmd.SetIO(ctx)

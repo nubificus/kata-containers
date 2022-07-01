@@ -78,14 +78,14 @@ func (u *uruncHypervisor) SaveVM() error {
 func (u *uruncHypervisor) AddDevice(ctx context.Context, devInfo interface{}, devType DeviceType) error {
 	logF := logrus.Fields{"src": "uruncio", "file": "cs/urunc_hypervisor.go", "func": "AddDevice"}
 
-	u.Logger().WithFields(logF).WithField("in AddDEvice", "InADdDevice").Error()
+	logrus.WithFields(logF).Error("")
 	switch v := devInfo.(type) {
 	case Endpoint:
+		logrus.WithFields(logF).Error("Endpoint")
 		u.uruncAddNetDevice(ctx, v)
 	default:
-		u.Logger().WithField("in AddDEvice", "didn't get a network device").Error()
+		logrus.WithFields(logF).Error("Default")
 	}
-
 	return nil
 }
 
@@ -109,17 +109,12 @@ func (u *uruncHypervisor) HotplugRemoveDevice(ctx context.Context, devInfo inter
 	}
 	return nil, nil
 }
+
+// This function just logs some Endpoint data
 func (u *uruncHypervisor) uruncAddNetDevice(ctx context.Context, endpoint Endpoint) error {
-
-	GuestMac := endpoint.HardwareAddr()
-	ifaceID := endpoint.Name()
-	HostDevName := endpoint.NetworkPair().TapInterface.TAPIface.Name
 	logF := logrus.Fields{"src": "uruncio", "file": "cs/urunc_hypervisor.go", "func": "uruncAddNetDevice"}
-
-	u.Logger().WithFields(logF).WithField("iFaceID", ifaceID).Error()
-	u.Logger().WithFields(logF).WithField("GuestMac", GuestMac).Error()
-	u.Logger().WithFields(logF).WithField("HostDevName", HostDevName).Error()
-
+	netData := logrus.Fields{"GuestMac": endpoint.HardwareAddr(), "ifaceID": endpoint.Name(), "HostDevName": endpoint.NetworkPair().TapInterface.TAPIface.Name}
+	logrus.WithFields(logF).WithFields(netData).Error("")
 	return nil
 }
 

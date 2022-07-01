@@ -42,6 +42,14 @@ type uruncAgent struct {
 	ExecData ExecData
 }
 
+// helper function to parse ls results
+func cleanLsRes(res string) string {
+	res = strings.ReplaceAll(res, "\n", " ")
+	res = strings.ReplaceAll(res, "  ", " ")
+	res = strings.TrimSpace(res)
+	return res
+}
+
 func (u *uruncAgent) Logger() *logrus.Entry {
 	return virtLog.WithField("subsystem", "urunc_agent")
 }
@@ -70,10 +78,10 @@ func (u *uruncAgent) GetExecData() ExecData {
 // init initializes the Noop agent, i.e. it does nothing.
 func (u *uruncAgent) init(ctx context.Context, sandbox *Sandbox, config KataAgentConfig) (bool, error) {
 	logF := logrus.Fields{"src": "uruncio", "file": "vs/urunc_agent.go", "func": "init"}
-	u.Logger().WithFields(logF).Error("urunc agent init")
+	logrus.WithFields(logF).Error("urunc agent init")
 	for _, mnt := range sandbox.config.SandboxBindMounts {
 		msg := "mount is " + mnt
-		u.Logger().WithFields(logF).Error(msg)
+		logrus.WithFields(logF).Error(msg)
 	}
 	return false, nil
 }
@@ -117,162 +125,158 @@ func (u *uruncAgent) stopSandbox(ctx context.Context, sandbox *Sandbox) error {
 
 func (u *uruncAgent) addNetworkData(ctx context.Context, sandbox *Sandbox) error {
 	logF := logrus.Fields{"src": "uruncio", "file": "vc/urunc_agent.go", "func": "addNetworkData"}
+	logrus.WithFields(logF).Error("")
 
 	if u.ExecData.IPAddress == "" {
-		u.Logger().WithFields(logF).Error("IP empty, generating...")
+		logrus.WithFields(logF).Error("IP not set, generating...")
 		interfaces, routes, _, err := generateVCNetworkStructures(ctx, sandbox.network)
-		// interfaces, routes, neighs, err := generateVCNetworkStructures(ctx, sandbox.network)
 		if err != nil {
-			u.Logger().WithFields(logF).WithField("errmsg", err.Error()).Error("IP error...")
+			logrus.WithFields(logF).WithField("errmsg", err.Error()).Error("IP generation error...")
 			return err
 		}
-		u.Logger().WithFields(logF).WithField("interfaces", len(interfaces)).Error("LENS")
-		u.Logger().WithFields(logF).WithField("routes", len(routes)).Error("LENS")
+		logrus.WithFields(logF).WithField("interfaces len", len(interfaces)).WithField("routes len", len(routes)).Error("")
 
-		if len(interfaces) == 1 && len(routes) == 1 {
-			IPAddress := interfaces[0].IPAddresses[0].Address
-			mask := interfaces[0].IPAddresses[0].Mask
-			tap := interfaces[0].Device
-			gw := routes[0].Gateway
-			u.ExecData.IPAddress = IPAddress
-			u.ExecData.Mask = mask
-			u.ExecData.Tap = tap
-			u.ExecData.Gateway = gw
-			u.Logger().WithFields(logF).WithField("IPAddress", IPAddress).Error("addNetworkData 4.5")
-			u.Logger().WithFields(logF).WithField("mask", mask).Error("addNetworkData 4.5")
-			u.Logger().WithFields(logF).WithField("device", tap).Error("addNetworkData 4.5")
-			u.Logger().WithFields(logF).WithField("name", interfaces[0].Name).Error("addNetworkData 4.5")
-			u.Logger().WithFields(logF).WithField("gw", gw).Error("addNetworkData 4.5")
+		// usually there are 2 routes and 1 interface, so I take the first of each one
+		if len(routes) >= 1 && len(interfaces) >= 1 {
+			u.ExecData.IPAddress = interfaces[0].IPAddresses[0].Address
+			u.ExecData.Mask = interfaces[0].IPAddresses[0].Mask
+			u.ExecData.Tap = interfaces[0].Device
+			u.ExecData.Gateway = routes[0].Gateway
+			netData := logrus.Fields{"IP": interfaces[0].IPAddresses[0].Address, "mask": interfaces[0].IPAddresses[0].Mask, "tap": interfaces[0].Device, "gw": routes[0].Gateway}
+			logrus.WithFields(logF).WithFields(netData).Error("")
 		} else {
-			u.Logger().WithFields(logF).WithField("interfaces", len(interfaces)).Error("Network fail")
+			logrus.WithFields(logF).Error("Network creation failed")
+			return errors.New("Network creation failed")
 		}
+	} else {
+		logrus.WithFields(logF).Error("Network is already created")
 	}
-	u.Logger().WithFields(logF).WithField("IPADDR", u.ExecData.IPAddress).Error("IPADDR")
 	return nil
 }
 
-// createContainer is the Noop agent Container creation implementatiou. It does nothing.
+// createContainer retrieves the net data, mounts rootfs if necessary and
+// populates the uruncAgent exec data fields
 func (u *uruncAgent) createContainer(ctx context.Context, sandbox *Sandbox, c *Container) (*Process, error) {
 	logF := logrus.Fields{"src": "uruncio", "file": "vc/urunc_agent.go", "func": "createContainer"}
 
+	// Get the network data
 	u.ExecData.Container = c
-
 	u.addNetworkData(ctx, sandbox)
-	u.Logger().WithFields(logF).WithField("IPADDR", u.ExecData.IPAddress).Error("IPADDR")
+	if u.ExecData.IPAddress != "" {
+		logrus.WithFields(logF).WithField("IP", u.ExecData.IPAddress).Error("Network data added")
+	} else {
+		logrus.WithFields(logF).Error("Network creation failed")
+	}
 
-	// first lets get some data to better understand the process.
+	// Find the bundle data
+	logrus.WithFields(logF).WithField("CID", c.ID()).Error("")
+	logrus.WithFields(logF).WithField("SID", sandbox.ID()).Error("")
 
-	// First, let's find our cwd.
+	lsPrefix := "."
+
+	// Find cwd
 	cwdPath, err := os.Getwd()
 	if err != nil {
-		u.Logger().WithFields(logF).WithField("errmsg", err.Error()).Error("cwd error")
+		logrus.WithFields(logF).WithField("cwdErr", err.Error()).Error("")
 	} else {
-		u.Logger().WithFields(logF).WithField("cwd", string(cwdPath)).Error("cwd OK")
+		logrus.WithFields(logF).WithField("cwd", string(cwdPath)).Error("")
+	}
+	cwdPath = strings.ReplaceAll(cwdPath, " ", "")
+	cwdPath = strings.TrimSpace(cwdPath)
+
+	// Check if sandboxID eq containerID
+	if c.ID() != sandbox.ID() {
+		logrus.WithFields(logF).Error("Sandbox already exists")
+		cwdPath = strings.ReplaceAll(cwdPath, sandbox.ID(), c.ID())
+		lsPrefix = cwdPath
+	}
+
+	// Mount device if needed and parse rootfs for binary
+
+	// The expected file structure is:
+	// .
+	// ..
+	// address
+	// config.json
+	// rootfs
+	// shim-binary-path
+	// shim.pid
+	// work
+
+	// Our rootfs path
+	rootFsPath := cwdPath + "/" + c.rootfsSuffix
+
+	// Let's find out more info from c.Rootfs
+	logrus.WithFields(logF).WithField("rootFs source", c.rootFs.Source).Error("")
+	logrus.WithFields(logF).WithField("rootFs target", c.rootFs.Target).Error("")
+	logrus.WithFields(logF).WithField("rootFs Type", c.rootFs.Type).Error("")
+
+	// If c.rootFs.source contains "dm-", we need to mount the devmapper device
+	if strings.Contains(c.rootFs.Source, "dm") {
+		logrus.WithFields(logF).Error("is devmapper, mounting...")
+		logrus.WithFields(logF).WithField("rootFsPath", rootFsPath).Error("")
+		mntOut, err := osexec.Command("mount", "-t", c.rootFs.Type, c.rootFs.Source, rootFsPath).CombinedOutput()
+		if err != nil {
+			logrus.WithFields(logF).WithField("mountErr", err.Error()).Error("")
+		} else {
+			c.rootFs.Mounted = true
+			c.rootFs.Target = rootFsPath
+			logrus.WithFields(logF).WithField("mount", string(mntOut)).Error("devmapper device mounted")
+		}
 	}
 
 	// Let's find our cwd direct subdirs/files.
-	ls1Out, err := osexec.Command("ls").Output()
+	ls1Out, err := osexec.Command("ls", lsPrefix).Output()
+	ls1 := cleanLsRes(string(ls1Out))
 	if err != nil {
-		u.Logger().WithFields(logF).WithField("errmsg", err.Error()).Error("ls 1 error")
+		logrus.WithFields(logF).WithField("ls1err", err.Error()).Error("")
 	} else {
-		u.Logger().WithFields(logF).WithField("out", string(ls1Out)).Error("ls 1 OK")
+		logrus.WithFields(logF).WithField("ls1", ls1).Error("")
 	}
 
 	// Our cwd had a ./rootfs subdir. Let's have a closer look:
-	ls2Out, err := osexec.Command("ls", "rootfs").Output()
+	ls2Out, err := osexec.Command("ls", lsPrefix+"/rootfs").Output()
+	ls2 := cleanLsRes(string(ls2Out))
 	if err != nil {
-		u.Logger().WithFields(logF).WithField("errmsg", err.Error()).Error("ls 2 error")
+		logrus.WithFields(logF).WithField("ls2err", err.Error()).Error("")
 	} else {
-		u.Logger().WithFields(logF).WithField("out", string(ls2Out)).Error("ls 2 OK")
-	}
-
-	// This needs to change to the cwd path. the default ns is not used.
-	// rootFsPath := "/run/containerd/io.containerd.runtime.v2.task/default/" + c.id + "/" + c.rootfsSuffix
-
-	cwdPath = strings.ReplaceAll(cwdPath, " ", "")
-	cwdPath = strings.TrimSpace(cwdPath)
-	rootFsPath := cwdPath + "/" + c.rootfsSuffix
-	u.Logger().WithFields(logF).WithField("rootFsPath", rootFsPath).Error("")
-
-	// we need to check if is devmapper or not.
-	// if c.rootFs.Source is "", then no devmapper.
-	// if c.rootFs.Source is "/dev/dm-*", then we need to mount the block device
-	if c.rootFs.Source != "" {
-		u.Logger().WithFields(logF).Error("Devmapper")
-
-		// We can mount the block device either in one of the two provided dirs
-		// - defaultKataHostSharedDir     = "/run/kata-containers/shared/sandboxes/"
-		// - defaultKataGuestSharedDir    = "/run/kata-containers/shared/containers/"
-
-		// I used to create a "/run/kata-containers/shared/containers/"+Container ID dir and mount it there. If that's
-		// the case, we will need to change dir, or change the search prefix to find the file.
-
-		// or we can mount in our current dir's rootfs subdirectory:
-		// /run/containerd/io.containerd.runtime.v2.task/default/{Container ID}/rootfs
-		// and keep the same workflow as if it wasn't a devmap device.
-
-		mntOut, err := osexec.Command("mount", c.rootFs.Source, rootFsPath).CombinedOutput()
-		if err != nil {
-			u.Logger().WithFields(logF).WithField("errmsg", err.Error()).Error("mount error")
-		} else {
-			u.Logger().WithFields(logF).WithField("out", string(mntOut)).Error("mount OK")
-		}
-	}
-
-	// Now the ./rootfs/ dir should contain the unikernel or the pause file.
-	ls3out, err := osexec.Command("ls", "rootfs").Output()
-	if err != nil {
-		u.Logger().WithFields(logF).WithField("errmsg", err.Error()).Error("ls 3 error")
-	} else {
-		u.Logger().WithFields(logF).WithField("out", string(ls3out)).Error("ls 3 OK")
+		logrus.WithFields(logF).WithField("ls2", ls2).Error("")
 	}
 
 	// we need to parse the contents of the bundle's rootfs.
-	// if it contains a single /unikernel/file, we execute that file.
-	// if it contains a single /pause file, we do nothing (or execute it, we must explore that)
-	// if it contains a /unikernel/*.hvt file, we must create a cmd string and execute it,.
-
-	lsResult := string(ls3out)
-	lsResult = strings.ReplaceAll(lsResult, "\n", "")
-	lsResult = strings.ReplaceAll(lsResult, "/", "")
-	lsResult = strings.ReplaceAll(lsResult, " ", "")
-	u.Logger().WithFields(logF).WithField("lsResult", lsResult).Error("")
-
-	if lsResult == "pause" {
+	// if it contains a single /unikernel/binary or /pause we execute that file.
+	// if it contains a /unikernel/*.hvt or /unikernel/*.qm file, we must create a cmd string and execute it
+	switch ls2 {
+	case "pause":
 		u.ExecData.BinaryType = "pause"
 		u.ExecData.BinaryPath = rootFsPath + "/pause"
-	} else if lsResult != "unikernel" {
-		return &Process{}, errors.New("requested image not supported")
-	} else {
-		// if we made it to this step, we need to find if .hvt or not
-		ls4out, err := osexec.Command("ls", "rootfs/unikernel").Output()
+		logrus.WithFields(logF).WithField("file", u.ExecData.BinaryPath).Error("")
+		logrus.WithFields(logF).WithField("type", u.ExecData.BinaryType).Error("")
+	case "unikernel":
+		ls3out, err := osexec.Command("ls", lsPrefix+"/rootfs/unikernel").Output()
+		ls3 := cleanLsRes(string(ls3out))
 		if err != nil {
-			u.Logger().WithFields(logF).WithField("errmsg", err.Error()).Error("ls 4 error")
+			logrus.WithFields(logF).WithField("ls3err", err.Error()).Error("")
 		} else {
-			u.Logger().WithFields(logF).WithField("out", string(ls4out)).Error("ls 4 OK")
+			logrus.WithFields(logF).WithField("ls3", ls3).Error("")
 		}
-		lsResult := string(ls4out)
-		lsResult = strings.ReplaceAll(lsResult, "\n", "")
-		lsResult = strings.ReplaceAll(lsResult, "/", "")
-		lsResult = strings.ReplaceAll(lsResult, " ", "")
-		u.Logger().WithFields(logF).WithField("unikernelBinary", string(lsResult)).Error("ls4out")
 
 		// now let's check if ".hvt" or not
-		if strings.Contains(lsResult, ".hvt") {
+		if strings.Contains(ls3, ".hvt") {
 			u.ExecData.BinaryType = "hvt"
-			u.ExecData.BinaryPath = rootFsPath + "/unikernel/" + lsResult
-		} else if strings.Contains(lsResult, ".qm") {
+			u.ExecData.BinaryPath = rootFsPath + "/unikernel/" + ls3
+		} else if strings.Contains(ls3, ".qm") {
 			u.ExecData.BinaryType = "qemu"
-			u.ExecData.BinaryPath = rootFsPath + "/unikernel/" + lsResult
+			u.ExecData.BinaryPath = rootFsPath + "/unikernel/" + ls3
 		} else {
 			u.ExecData.BinaryType = "binary"
-			u.ExecData.BinaryPath = rootFsPath + "/unikernel/" + lsResult
+			u.ExecData.BinaryPath = rootFsPath + "/unikernel/" + ls3
 		}
+		logrus.WithFields(logF).WithField("file", u.ExecData.BinaryPath).Error("")
+		logrus.WithFields(logF).WithField("type", u.ExecData.BinaryType).Error("")
+	default:
+		return &Process{}, errors.New("requested image not supported")
 	}
-	u.Logger().WithFields(logF).WithField("u.ExecData", u.ExecData.BinaryType).Error("return")
-
-	// we must also create a netns, find the IP and pass them as args to qemu
-
 	return &Process{}, nil
 }
 
