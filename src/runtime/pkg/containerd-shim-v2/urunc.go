@@ -2,10 +2,10 @@ package containerdshim
 
 import (
 	"context"
+	"encoding/json"
 	"io"
 	"net"
 	osexec "os/exec"
-	"strconv"
 	"strings"
 	"time"
 
@@ -13,6 +13,34 @@ import (
 	"github.com/kata-containers/kata-containers/src/runtime/virtcontainers"
 	"github.com/sirupsen/logrus"
 )
+
+// {"cmdline":"redis-server","net":{"if":"ukvmif0","cloner":"True","type":"inet","method":"static","addr":"10.10.10.2","mask":"16"}}
+
+type HvtArgsNetwork struct {
+	If     string `json:"if"`
+	Cloner string `json:"cloner"`
+	Type   string `json:"type"`
+	Method string `json:"method"`
+	Addr   string `json:"addr"`
+	Mask   string `json:"mask"`
+	// Gw     string `json:"gw"`
+}
+
+type HvtArgsBlock struct {
+	Source string `json:"source"`
+	Path   string `json:"path"`
+	Fstype string `json:"fstype"`
+	Mount  string `json:"mountpoint"`
+}
+
+type HvtArgs struct {
+	Cmdline string         `json:"cmdline"`
+	Net     HvtArgsNetwork `json:"net"`
+	Blk     *HvtArgsBlock  `json:"blk,omitempty"`
+	Env     []string       `json:"env,omitempty"`
+	Cwd     string         `json:"cwd,omitempty"`
+	Mem     string         `json:"mem,omitempty"`
+}
 
 type Command struct {
 	cmdString string
@@ -65,17 +93,35 @@ func HvtCmd(execData virtcontainers.ExecData) string {
 	ns := nsParts[len(nsParts)-1]
 	logrus.WithFields(logF).WithField("NetNs1", execData.NetNs).Error("")
 	logrus.WithFields(logF).WithField("NetNs2", ns).Error("")
-	// ns = "HAHAHAHAHAH"
 
 	HvtMonitor := "/home/gntouts/bin/solo5-hvt"
 	// ./tenders/hvt/solo5-hvt --net:service0=tap192  tests/test_net/test_net.hvt
 	// return HvtMonitor + "--net:service0=" + execData.Tap + " " + execData.BinaryPath
 	// /solo5-hvt --net=tap100 -- redis.hvt '{"cmdline":"redis-server","net":{"if":"ukvmif0","cloner":"True","type":"inet","method":"static","addr":"10.10.10.2","mask":"16"}}'
-	cmdString := "ip netns exec " + ns + " " + HvtMonitor + " --net=" + execData.Tap + " " + execData.BinaryPath + ` '{"cmdline":"redis-server","net":{"if":"ukvmif0","cloner":"True","type":"inet","method":"static","addr":"10.10.10.2","mask":"16"}}'`
 
-	stripped := strings.Replace(cmdString, "\\", "", -1)
-	unqoted, _ := strconv.Unquote(stripped)
-	logrus.WithFields(logF).WithField("cmd", unqoted).Error("")
+	hvtNet := HvtArgsNetwork{
+		If:     "ukvmif0",
+		Cloner: "True",
+		Type:   "inet",
+		Method: "static",
+		Addr:   "10.10.10.2",
+		Mask:   "16",
+	}
+
+	hvtArgs := HvtArgs{
+		Cmdline: "redis-server",
+		Net:     hvtNet,
+	}
+	b, _ := json.Marshal(hvtArgs)
+	cmdString := "ip netns exec " + ns + " " + HvtMonitor + " --net=" + execData.Tap + " " + execData.BinaryPath + " " + string(b)
+
+	// stripped := strings.Replace(cmdString, "\\", "", -1)
+	// unquoted := fmt.Sprintln(stripped)
+	// unqoted, err := strconv.Unquote(stripped)
+	// if err != nil {
+	// 	logrus.WithFields(logF).WithField("err", err.Error()).Error("")
+	// }
+	logrus.WithFields(logF).WithField("cmd", cmdString).Error("")
 	// cmdParts := strings.Split(stripped, " ")
 
 	// name, args := cmdParts[0], cmdParts[1:]
@@ -91,7 +137,7 @@ func HvtCmd(execData virtcontainers.ExecData) string {
 	// logrus.WithFields(logF).WithField("out", string(output)).Error("")\
 	// na doume kai to GW mhpws xreiazetai!
 
-	return unqoted
+	return cmdString
 
 }
 
