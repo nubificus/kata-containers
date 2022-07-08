@@ -297,6 +297,21 @@ func (u *uruncAgent) startContainer(ctx context.Context, sandbox *Sandbox, c *Co
 // Unmounts block device and tries to remove any related directories
 func (u *uruncAgent) stopContainer(ctx context.Context, sandbox *Sandbox, c Container) error {
 	logF := logrus.Fields{"src": "uruncio", "file": "vc/urunc_agent.go", "func": "stopContainer"}
+	logrus.WithFields(logF).WithField("cid", c.id).Error("")
+
+	// psOut, _ := osexec.Command("ps", "-ef", "|", "grep", c.id).Output()
+	// logrus.WithFields(logF).WithField("psOut", string(psOut)).Error("")
+
+	// pcs, err := ps.Processes()
+	// if err == nil {
+	// 	for _, pc := range pcs {
+	// 		logrus.WithFields(logF).WithField("process", "mew").Error("ps")
+	// 		p := pc.Executable()
+	// 		logrus.WithFields(logF).WithField("pid", p).Error("ps")
+	// 	}
+	// }
+	// logrus.WithFields(logF).WithField("ps-go", "end").Error("")
+
 	rootfsSourcePath := c.rootFs.Source
 	u.Logger().WithFields(logF).WithField("rootfsSourcePath", rootfsSourcePath).Error("stopContainer 1")
 
@@ -345,6 +360,7 @@ func (u *uruncAgent) stopContainer(ctx context.Context, sandbox *Sandbox, c Cont
 			u.Logger().WithFields(logF).WithField("out", string(rmOut)).Error("rm sandbox OK")
 		}
 	}
+
 	return nil
 }
 
@@ -516,3 +532,94 @@ func (u *uruncAgent) getGuestVolumeStats(ctx context.Context, volumeGuestPath st
 func (u *uruncAgent) resizeGuestVolume(ctx context.Context, volumeGuestPath string, size uint64) error {
 	return nil
 }
+
+// URUNC SPECIFIC LOGIC
+
+// type Command struct {
+// 	cmdString string
+// 	id        string
+// 	stdin     string
+// 	stdout    string
+// 	stderr    string
+// 	bundle    string
+// 	exec      *osexec.Cmd
+// }
+
+// func (u *uruncAgent) CreateCommand(execData ExecData) *Command {
+// 	logF := logrus.Fields{"src": "uruncio", "file": "vc/urunc_agent.go", "func": "CreateCommand"}
+// 	cmdString := CmdLine(execData)
+// 	logrus.WithField("BinaryType", execData.BinaryType).WithFields(logF).Error("exec info")
+// 	logrus.WithField("cmdString", cmdString).WithFields(logF).Error("exec info")
+
+// 	args := strings.Split(cmdString, " ")
+// 	var newCmd *osexec.Cmd
+// 	if len(args) == 1 {
+// 		logrus.WithField("cmdString", args[0]).WithFields(logF).Error("exec info")
+// 		newCmd = osexec.Command(args[0])
+// 	} else {
+// 		name, args := args[0], args[1:]
+// 		newCmd = osexec.Command(name, args...)
+// 	}
+// 	return &Command{cmdString: cmdString, container: container, id: container.id, stdin: container.stdin, stdout: container.stdout, stderr: container.stderr, bundle: container.bundle, exec: newCmd}
+// }
+
+// func CmdLine(execData ExecData) string {
+
+// 	// BinaryType string
+// 	// BinaryPath string
+// 	// IPAddress  string
+// 	// Mask       string
+// 	// Tap        string
+// 	// Container  *Container
+// 	logF := logrus.Fields{"src": "uruncio", "file": "vc/urunc_agent.go", "func": "CmdLine"}
+// 	logrus.WithField("BinaryType", execData.BinaryType).WithFields(logF).Error("ExecData")
+// 	logrus.WithField("BinaryPath", execData.BinaryPath).WithFields(logF).Error("ExecData")
+// 	logrus.WithField("IPAddress", execData.IPAddress).WithFields(logF).Error("ExecData")
+// 	logrus.WithField("Mask", execData.Mask).WithFields(logF).Error("ExecData")
+// 	logrus.WithField("Tap", execData.Tap).WithFields(logF).Error("ExecData")
+// 	logrus.WithField("Container", execData.Container.ID()).WithFields(logF).Error("ExecData")
+
+// 	switch execData.BinaryType {
+// 	case "pause":
+// 		return execData.BinaryPath
+// 	case "hvt":
+// 		return HvtCmd(execData)
+// 	case "qemu":
+// 		return QemuCmd(execData)
+// 	case "binary":
+// 		return execData.BinaryPath
+// 	default:
+// 		return ""
+// 	}
+// }
+
+// func HvtCmd(execData ExecData) string {
+// 	// ./tenders/hvt/solo5-hvt --net:service0=tap192  tests/test_net/test_net.hvt
+// 	return "HvtMonitor" + "--net:service0=" + execData.Tap + " " + execData.BinaryPath
+// }
+
+// func QemuCmd(execData ExecData) string {
+// 	qemuCmd := "qemu-system-x86_64 -cpu host"
+// 	qemuCmd += " -enable-kvm"
+// 	qemuCmd += " -m 128"
+// 	qemuCmd += " -nodefaults -no-acpi "
+// 	qemuCmd += " -display none -serial stdio "
+// 	qemuCmd += " -device isa-debug-exit "
+// 	qemuCmd += " -net nic,model=virtio "
+// 	qemuCmd += " -net tap,script=no,ifname=" + execData.Tap
+// 	qemuCmd += " -kernel " + execData.BinaryPath
+// 	qemuCmd += " -append \"netdev.ipv4_addr=" + execData.IPAddress + "netdev.ipv4_gw_addr=" + execData.Gateway + " netdev.ipv4_subnet_mask=255.255.255.255 --"
+
+// 	// qemu-system-x86_64 \
+// 	//     -cpu host \
+// 	//     -enable-kvm \
+// 	//     -m 128 \
+// 	//     -nodefaults -no-acpi \
+// 	//     -display none -serial stdio \
+// 	//     -device isa-debug-exit \
+// 	//     -net nic,model=virtio \
+// 	//     -net tap,script=no,ifname=tap106 \
+// 	//     -kernel /app-helloworld_kvm-x86_64 \
+// 	//     -append "netdev.ipv4_addr=$IP netdev.ipv4_gw_addr=169.254.1.1 netdev.ipv4_subnet_mask=255.255.255.255 --"
+// 	return qemuCmd
+// }

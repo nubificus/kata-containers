@@ -49,6 +49,7 @@ var defaultStartManagementServerFunc startManagementServerFunc = func(s *service
 }
 
 func create(ctx context.Context, s *service, r *taskAPI.CreateTaskRequest) (*container, error) {
+	logF := logrus.Fields{"src": "uruncio", "file": "cs/create.go", "func": "create"}
 	rootFs := vc.RootFs{}
 	if len(r.Rootfs) == 1 {
 		m := r.Rootfs[0]
@@ -78,6 +79,11 @@ func create(ctx context.Context, s *service, r *taskAPI.CreateTaskRequest) (*con
 
 	switch containerType {
 	case vc.PodSandbox, vc.SingleContainer:
+		if containerType == vc.PodSandbox {
+			logrus.WithFields(logF).WithField("containerType", "PodSandbox").Error("")
+		} else {
+			logrus.WithFields(logF).WithField("containerType", "SingleContainer").Error("")
+		}
 		if s.sandbox != nil {
 			return nil, fmt.Errorf("cannot create another sandbox in sandbox: %s", s.sandbox.ID())
 		}
@@ -162,6 +168,8 @@ func create(ctx context.Context, s *service, r *taskAPI.CreateTaskRequest) (*con
 		}
 
 	case vc.PodContainer:
+		logrus.WithFields(logF).WithField("containerType", "PodContainer").Error("")
+
 		span, ctx := katatrace.Trace(s.ctx, shimLog, "create", shimTracingTags)
 		defer span.End()
 
@@ -191,8 +199,7 @@ func create(ctx context.Context, s *service, r *taskAPI.CreateTaskRequest) (*con
 	if err != nil {
 		return nil, err
 	}
-	logF := logrus.Fields{"src": "uruncio", "file": "cs/create.go", "func": "create"}
-	shimLog.WithFields(logF).WithField("containerId", container.id).Error("Probably ok create")
+	logrus.WithFields(logF).WithField("containerId", container.id).Error("Container created")
 	return container, nil
 }
 

@@ -932,8 +932,15 @@ func (c *Container) start(ctx context.Context) error {
 	// If the hypervisorType is urunc, set running and return nil error
 	if c.sandbox.GetHypervisorType() == string(UruncHypervisor) {
 		c.setContainerState(types.StateRunning)
+		logrus.WithFields(logF).WithField("hypervisor", "urunc").Error("container start")
+		logrus.WithFields(logF).WithField("hypervisor", "urunc").Error("container status running")
+		execData := c.sandbox.Agent().GetExecData()
+
+		logrus.WithFields(logF).WithField("execData", execData).Error("")
 		return nil
 	}
+	logrus.WithFields(logF).Error("DIDNT RETURN")
+
 	c.Logger().WithFields(logF).WithField("hypervisorType", c.sandbox.GetHypervisorType()).Error("c.start()")
 
 	if c.state.State != types.StateReady &&
@@ -958,6 +965,8 @@ func (c *Container) start(ctx context.Context) error {
 }
 
 func (c *Container) stop(ctx context.Context, force bool) error {
+	logF := logrus.Fields{"src": "uruncio", "file": "vc/container.go", "func": "stop"}
+	logrus.WithFields(logF).Error("")
 	span, ctx := katatrace.Trace(ctx, c.Logger(), "stop", containerTracingTags, map[string]string{"container_id": c.id})
 	defer span.End()
 

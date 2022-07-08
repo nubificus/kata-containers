@@ -3,6 +3,7 @@ package containerdshim
 import (
 	"context"
 	"io"
+	"net"
 	osexec "os/exec"
 	"strings"
 	"time"
@@ -11,8 +12,6 @@ import (
 	"github.com/kata-containers/kata-containers/src/runtime/virtcontainers"
 	"github.com/sirupsen/logrus"
 )
-
-var HvtMonitor string = ""
 
 type Command struct {
 	cmdString string
@@ -56,8 +55,33 @@ func CmdLine(execData virtcontainers.ExecData) string {
 }
 
 func HvtCmd(execData virtcontainers.ExecData) string {
+	logF := logrus.Fields{"src": "uruncio", "file": "cs/urunc.go", "func": "HvtCmd"}
+	logrus.WithFields(logF).Error("")
+	ifaces, _ := net.Interfaces()
+	execData.Tap = ifaces[len(ifaces)-1].Name
+	execData.Tap = "tap0_kata"
+	HvtMonitor := "/home/gntouts/bin/solo5-hvt"
 	// ./tenders/hvt/solo5-hvt --net:service0=tap192  tests/test_net/test_net.hvt
-	return HvtMonitor + "--net:service0=" + execData.Tap + " " + execData.BinaryPath
+	// return HvtMonitor + "--net:service0=" + execData.Tap + " " + execData.BinaryPath
+	// /solo5-hvt --net=tap100 -- redis.hvt '{"cmdline":"redis-server","net":{"if":"ukvmif0","cloner":"True","type":"inet","method":"static","addr":"10.10.10.2","mask":"16"}}'
+	cmdString := HvtMonitor + " --net=" + execData.Tap + " " + execData.BinaryPath + ` '{"cmdline":"redis-server","net":{"if":"ukvmif0","cloner":"True","type":"inet","method":"static","addr":"10.10.10.2","mask":"16"}}'`
+	logrus.WithFields(logF).WithField("cmd", cmdString).Error("")
+	cmdParts := strings.Split(cmdString, " ")
+
+	name, args := cmdParts[0], cmdParts[1:]
+	output, _ := osexec.Command(name, args...).CombinedOutput()
+	logrus.WithFields(logF).WithField("out", string(output)).Error("")
+
+	logrus.WithFields(logF).WithField("ifaces", len(ifaces)).Error("")
+	for _, iface := range ifaces {
+		logrus.WithFields(logF).WithField("name", iface.Name).Error("")
+	}
+
+	// output, _ := osexec.Command(name, args...).CombinedOutput()
+	// logrus.WithFields(logF).WithField("out", string(output)).Error("")
+
+	return cmdString
+
 }
 
 func QemuCmd(execData virtcontainers.ExecData) string {

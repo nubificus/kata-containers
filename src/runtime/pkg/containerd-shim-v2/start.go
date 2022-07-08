@@ -38,10 +38,7 @@ func startContainer(ctx context.Context, s *service, c *container) (retErr error
 		err := fmt.Errorf("Bug, the sandbox hasn't been created for this container %s", c.id)
 		return err
 	}
-	shimLog.WithField("s.sandbox", "not nil").WithFields(logF).Error("sandbox not nil")
-
-	// Before we procced to the existing kata workflow, check if hypervisor supports unikernel
-	// Also check if ExecData were provided from urunc_agent
+	logrus.WithField("s.sandbox", "not nil").WithFields(logF).Error("")
 
 	shimLog.WithField("container", c.id).Debug("start container")
 
@@ -49,37 +46,38 @@ func startContainer(ctx context.Context, s *service, c *container) (retErr error
 	// hopefully we can get the agent.ExecData field
 	execData := s.sandbox.Agent().GetExecData()
 	// logrus.WithFields(logF).Error(execData.BinaryPath)
-	shimLog.WithFields(logF).WithField("BinaryPath", execData.BinaryPath).Error("coninfo")
-	shimLog.WithFields(logF).WithField("BinaryType", execData.BinaryType).Error("coninfo")
-	shimLog.WithFields(logF).WithField("IPAddress", execData.IPAddress).Error("coninfo")
-	shimLog.WithFields(logF).WithField("Mask", execData.Mask).Error("coninfo")
-	shimLog.WithFields(logF).WithField("Gateway", execData.Gateway).Error("coninfo")
-	shimLog.WithFields(logF).WithField("Tap", execData.Tap).Error("coninfo")
-	shimLog.WithField("container type", c.cType).WithFields(logF).Error("coninfo")
-	shimLog.WithField("hyperVisorpid", s.hpid).WithFields(logF).Error("coninfo")
-	shimLog.WithField("shimpid", s.pid).WithFields(logF).Error("coninfo")
-	shimLog.WithField("hypervisorUnikernel", s.config.HypervisorConfig.Unikernel).WithFields(logF).Error("coninfo")
+	logData := logrus.Fields{
+		"path":      execData.BinaryPath,
+		"btype":     execData.BinaryType,
+		"ip":        execData.IPAddress,
+		"mask":      execData.Mask,
+		"gw":        execData.Gateway,
+		"tap":       execData.Tap,
+		"ctype":     c.cType,
+		"hpid":      s.hpid,
+		"shimpid":   s.pid,
+		"unikernel": s.config.HypervisorConfig.Unikernel,
+	}
+	logrus.WithFields(logF).WithFields(logData).Error("")
 
 	// Check if config has unikernel set to true and binary exists in rootfs
-	binaryType := s.sandbox.Agent().GetExecData().BinaryType
+	binaryType := execData.BinaryType
 	if s.config.HypervisorConfig.Unikernel && binaryType == "" {
 		return errors.New("unikernel not found in rootfs")
 	}
 
-	// If the hypervisor is not urunc, execute the normal flow
 	if c.cType.IsSandbox() {
+		logrus.WithFields(logF).WithField("cType", "sandbox").Error("")
 
 		if s.config.HypervisorConfig.Unikernel {
+			logrus.WithFields(logF).WithField("unikernelHypervisor", s.config.HypervisorConfig.Unikernel).Error("")
 			unikernelFile := s.sandbox.Agent().GetExecData().BinaryPath
-			shimLog.WithField("unikernelFile", unikernelFile).WithFields(logF).Error("is unikernel and is sandbox")
-			if c.cType.IsSandbox() {
-				shimLog.WithFields(logF).Error("starting sandbox")
-				s.sandbox.Start(ctx)
-				shimLog.WithFields(logF).Error("sandbox started")
-			}
+			logrus.WithField("unikernelFile", unikernelFile).WithFields(logF).Error("")
+			logrus.WithFields(logF).Error("starting sandbox")
+			s.sandbox.Start(ctx)
+			logrus.WithFields(logF).Error("sandbox started")
 
-			shimLog.WithFields(logF).Error("starting container")
-
+			logrus.WithFields(logF).Error("starting container")
 			_, err := s.sandbox.StartContainer(ctx, c.id+"-unikernel")
 			if err != nil {
 				return err
@@ -112,13 +110,7 @@ func startContainer(ctx context.Context, s *service, c *container) (retErr error
 
 		if s.config.HypervisorConfig.Unikernel {
 			unikernelFile := s.sandbox.Agent().GetExecData().BinaryPath
-			shimLog.WithField("unikernelFile", unikernelFile).WithFields(logF).Error("is unikernel and is sandbox")
-			if c.cType.IsSandbox() {
-				shimLog.WithFields(logF).Error("starting sandbox")
-				s.sandbox.Start(ctx)
-				shimLog.WithFields(logF).Error("sandbox started")
-			}
-
+			shimLog.WithField("unikernelFile", unikernelFile).WithFields(logF).Error("is unikernel and is not sandbox")
 			shimLog.WithFields(logF).Error("starting container")
 
 			_, err := s.sandbox.StartContainer(ctx, c.id+"-unikernel")
@@ -138,7 +130,6 @@ func startContainer(ctx context.Context, s *service, c *container) (retErr error
 			}
 
 		}
-
 	}
 
 	// Run post-start OCI hooks.
@@ -211,7 +202,6 @@ func startContainer(ctx context.Context, s *service, c *container) (retErr error
 	}
 
 	go wait(ctx, s, c, "")
-
 	return nil
 }
 
