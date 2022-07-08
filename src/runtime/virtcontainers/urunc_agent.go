@@ -34,6 +34,7 @@ type ExecData struct {
 	Tap        string
 	Gateway    string
 	Container  *Container
+	NetNs      string
 }
 
 // uruncAgent is an empty Agent implementation, for deploying unikernels
@@ -62,6 +63,7 @@ func newExecData() ExecData {
 		Mask:       "",
 		Gateway:    "",
 		Tap:        "",
+		NetNs:      "",
 	}
 }
 
@@ -142,7 +144,9 @@ func (u *uruncAgent) addNetworkData(ctx context.Context, sandbox *Sandbox) error
 			u.ExecData.Mask = interfaces[0].IPAddresses[0].Mask
 			u.ExecData.Tap = interfaces[0].Device
 			u.ExecData.Gateway = routes[0].Gateway
-			netData := logrus.Fields{"IP": interfaces[0].IPAddresses[0].Address, "mask": interfaces[0].IPAddresses[0].Mask, "tap": interfaces[0].Device, "gw": routes[0].Gateway}
+			u.ExecData.NetNs = sandbox.GetNetNs()
+
+			netData := logrus.Fields{"IP": interfaces[0].IPAddresses[0].Address, "mask": interfaces[0].IPAddresses[0].Mask, "tap": interfaces[0].Device, "gw": routes[0].Gateway, "ns": sandbox.GetNetNs()}
 			logrus.WithFields(logF).WithFields(netData).Error("")
 		} else {
 			logrus.WithFields(logF).Error("Network creation failed")

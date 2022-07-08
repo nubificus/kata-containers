@@ -134,6 +134,9 @@ func startContainer(ctx context.Context, s *service, c *container) (retErr error
 
 	// Run post-start OCI hooks.
 	shimLog.WithFields(logF).Error("post-start OCI hook")
+	netNs := s.sandbox.GetNetNs()
+	logrus.WithFields(logF).WithField("netNs", netNs).Error("")
+
 	err := katautils.EnterNetNS(s.sandbox.GetNetNs(), func() error {
 		return katautils.PostStartHooks(ctx, *c.spec, s.sandbox.ID(), c.bundle)
 	})

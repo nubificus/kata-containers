@@ -5,6 +5,7 @@ import (
 	"io"
 	"net"
 	osexec "os/exec"
+	"strconv"
 	"strings"
 	"time"
 
@@ -60,17 +61,26 @@ func HvtCmd(execData virtcontainers.ExecData) string {
 	ifaces, _ := net.Interfaces()
 	execData.Tap = ifaces[len(ifaces)-1].Name
 	execData.Tap = "tap0_kata"
+	nsParts := strings.Split(execData.NetNs, "/")
+	ns := nsParts[len(nsParts)-1]
+	logrus.WithFields(logF).WithField("NetNs1", execData.NetNs).Error("")
+	logrus.WithFields(logF).WithField("NetNs2", ns).Error("")
+	// ns = "HAHAHAHAHAH"
+
 	HvtMonitor := "/home/gntouts/bin/solo5-hvt"
 	// ./tenders/hvt/solo5-hvt --net:service0=tap192  tests/test_net/test_net.hvt
 	// return HvtMonitor + "--net:service0=" + execData.Tap + " " + execData.BinaryPath
 	// /solo5-hvt --net=tap100 -- redis.hvt '{"cmdline":"redis-server","net":{"if":"ukvmif0","cloner":"True","type":"inet","method":"static","addr":"10.10.10.2","mask":"16"}}'
-	cmdString := HvtMonitor + " --net=" + execData.Tap + " " + execData.BinaryPath + ` '{"cmdline":"redis-server","net":{"if":"ukvmif0","cloner":"True","type":"inet","method":"static","addr":"10.10.10.2","mask":"16"}}'`
-	logrus.WithFields(logF).WithField("cmd", cmdString).Error("")
-	cmdParts := strings.Split(cmdString, " ")
+	cmdString := "ip netns exec " + ns + " " + HvtMonitor + " --net=" + execData.Tap + " " + execData.BinaryPath + ` '{"cmdline":"redis-server","net":{"if":"ukvmif0","cloner":"True","type":"inet","method":"static","addr":"10.10.10.2","mask":"16"}}'`
 
-	name, args := cmdParts[0], cmdParts[1:]
-	output, _ := osexec.Command(name, args...).CombinedOutput()
-	logrus.WithFields(logF).WithField("out", string(output)).Error("")
+	stripped := strings.Replace(cmdString, "\\", "", -1)
+	unqoted, _ := strconv.Unquote(stripped)
+	logrus.WithFields(logF).WithField("cmd", unqoted).Error("")
+	// cmdParts := strings.Split(stripped, " ")
+
+	// name, args := cmdParts[0], cmdParts[1:]
+	// output, _ := osexec.Command(name, args...).CombinedOutput()
+	// logrus.WithFields(logF).WithField("out", string(output)).Error("")
 
 	logrus.WithFields(logF).WithField("ifaces", len(ifaces)).Error("")
 	for _, iface := range ifaces {
@@ -78,9 +88,10 @@ func HvtCmd(execData virtcontainers.ExecData) string {
 	}
 
 	// output, _ := osexec.Command(name, args...).CombinedOutput()
-	// logrus.WithFields(logF).WithField("out", string(output)).Error("")
+	// logrus.WithFields(logF).WithField("out", string(output)).Error("")\
+	// na doume kai to GW mhpws xreiazetai!
 
-	return cmdString
+	return unqoted
 
 }
 
