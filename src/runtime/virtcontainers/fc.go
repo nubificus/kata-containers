@@ -13,6 +13,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"io/ioutil"
 	"net"
 	"net/http"
 	"os"
@@ -62,7 +63,8 @@ const (
 
 const (
 	//fcTimeout is the maximum amount of time in seconds to wait for the VMM to respond
-	fcTimeout = 10
+	// fcTimeout = 10
+	fcTimeout = 5
 	fcSocket  = "firecracker.socket"
 	//Name of the files within jailer root
 	//Having predefined names helps with Cleanup
@@ -288,6 +290,8 @@ func (fc *firecracker) vmRunning(ctx context.Context) bool {
 	}
 	// The current state of the Firecracker instance (swagger:model InstanceInfo)
 	state := *resp.Payload.State
+	fc.Logger().WithField("vm state", state).Error("fcio")
+
 	return state == "Running"
 }
 
@@ -414,18 +418,43 @@ func (fc *firecracker) fcInit(ctx context.Context, timeout int) error {
 	fc.Logger().WithField("hypervisor args", args).Debug()
 	fc.Logger().WithField("hypervisor cmd", cmd).Debug()
 
+	fc.Logger().WithField("hypervisor args", args).Error("fcio")
+	fc.Logger().WithField("hypervisor cmd", cmd).Error("fcio")
+
 	fc.Logger().Info("Starting VM")
 	if err := cmd.Start(); err != nil {
 		fc.Logger().WithField("Error starting firecracker", err).Debug()
+		fc.Logger().WithField("Error starting firecracker", err).Error("fcio")
 		return err
 	}
 
 	fc.info.PID = cmd.Process.Pid
 	fc.firecrackerd = cmd
 	fc.connection = fc.newFireClient(ctx)
+	fc.Logger().WithField("fc pid", fc.info.PID).Error("fcio")
+	fc.Logger().WithField("config", fc.fcConfigPath).Error("fcio")
+	fc.Logger().WithField("cmd wd", cmd.Dir).Error("fcio")
+	path, _ := os.Getwd()
+	fc.Logger().WithField("cwd", path).Error("fcio")
+
+	input, err := ioutil.ReadFile("/run/vc" + "/fcConfig.json")
+	if err != nil {
+		// fmt.Println(err)
+		fc.Logger().WithField("file reading failed:", err).Error("fcio")
+
+	}
+
+	err = ioutil.WriteFile("/home/gntouts/develop/scripts/config", input, 0644)
+	if err != nil {
+		fc.Logger().WithField("file writing failed:", err).Error("fcio")
+
+		// fmt.Println("Error creating", "destinationFile")
+		// fmt.Println(err)
+	}
 
 	if err := fc.waitVMMRunning(ctx, timeout); err != nil {
 		fc.Logger().WithField("fcInit failed:", err).Debug()
+		fc.Logger().WithField("fcInit failed:", err).Error("fcio")
 		return err
 	}
 	return nil
