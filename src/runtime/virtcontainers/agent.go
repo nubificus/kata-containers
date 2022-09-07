@@ -202,4 +202,7 @@ type agent interface {
 	resizeGuestVolume(ctx context.Context, volumeGuestPath string, size uint64) error
 
 	GetExecData() ExecData
+
+	// for testing
+	Name() string
 }

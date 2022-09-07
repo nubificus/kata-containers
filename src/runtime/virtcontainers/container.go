@@ -834,6 +834,7 @@ func (c *Container) checkBlockDeviceSupport(ctx context.Context) bool {
 // create creates and starts a container inside a Sandbox. It has to be
 // called only when a new container, not known by the sandbox, has to be created.
 func (c *Container) create(ctx context.Context) (err error) {
+
 	// In case the container creation fails, the following takes care
 	// of rolling back all the actions previously performed.
 	defer func() {
@@ -865,6 +866,7 @@ func (c *Container) create(ctx context.Context) (err error) {
 	if err != nil {
 		return err
 	}
+
 	c.process = *process
 
 	if err = c.setContainerState(types.StateReady); err != nil {

@@ -113,7 +113,12 @@ func HvtCmd(execData virtcontainers.ExecData) string {
 		Net:     hvtNet,
 	}
 	b, _ := json.Marshal(hvtArgs)
-	cmdString := "ip netns exec " + ns + " " + HvtMonitor + " --net=" + execData.Tap + " " + execData.BinaryPath + " " + string(b)
+	cmdString := ""
+	if execData.BlkDevice != "" {
+		cmdString = "ip netns exec " + ns + " " + HvtMonitor + " --net=" + execData.Tap + " --disk=" + execData.BlkDevice + " " + execData.BinaryPath + " " + string(b)
+	} else {
+		cmdString = "ip netns exec " + ns + " " + HvtMonitor + " --net=" + execData.Tap + " " + execData.BinaryPath + " " + string(b)
+	}
 
 	// stripped := strings.Replace(cmdString, "\\", "", -1)
 	// unquoted := fmt.Sprintln(stripped)

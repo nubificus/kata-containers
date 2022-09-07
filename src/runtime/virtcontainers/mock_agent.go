@@ -32,6 +32,10 @@ func (n *mockAgent) GetExecData() ExecData {
 	return ExecData{}
 }
 
+func (n *mockAgent) Name() string {
+	return "mock"
+}
+
 // init initializes the Noop agent, i.e. it does nothing.
 func (n *mockAgent) init(ctx context.Context, sandbox *Sandbox, config KataAgentConfig) (bool, error) {
 	return false, nil

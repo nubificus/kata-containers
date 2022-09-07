@@ -7,6 +7,9 @@ package virtcontainers
 
 import (
 	"errors"
+	"fmt"
+	"io"
+	"io/ioutil"
 	"os"
 	"path/filepath"
 	"strings"
@@ -35,6 +38,7 @@ type ExecData struct {
 	Gateway    string
 	Container  *Container
 	NetNs      string
+	BlkDevice  string
 }
 
 // uruncAgent is an empty Agent implementation, for deploying unikernels
@@ -64,6 +68,7 @@ func newExecData() ExecData {
 		Gateway:    "",
 		Tap:        "",
 		NetNs:      "",
+		BlkDevice:  "",
 	}
 }
 
@@ -75,6 +80,10 @@ func NewUruncAgent() agent {
 
 func (u *uruncAgent) GetExecData() ExecData {
 	return u.ExecData
+}
+
+func (u *uruncAgent) Name() string {
+	return "urunc"
 }
 
 // init initializes the Noop agent, i.e. it does nothing.
@@ -211,22 +220,100 @@ func (u *uruncAgent) createContainer(ctx context.Context, sandbox *Sandbox, c *C
 	rootFsPath := cwdPath + "/" + c.rootfsSuffix
 
 	// Let's find out more info from c.Rootfs
-	logrus.WithFields(logF).WithField("rootFs source", c.rootFs.Source).Error("")
-	logrus.WithFields(logF).WithField("rootFs target", c.rootFs.Target).Error("")
-	logrus.WithFields(logF).WithField("rootFs Type", c.rootFs.Type).Error("")
+	tempFields := logrus.Fields{
+		"rootFs_source": c.rootFs.Source,
+		"rootFs_target": c.rootFs.Target,
+		"rootFs_Type":   c.rootFs.Type,
+		"rootFs_Path":   rootFsPath,
+	}
+	logrus.WithFields(logF).WithFields(tempFields).Error("rootfs info")
 
-	// If c.rootFs.source contains "dm-", we need to mount the devmapper device
+	// If c.rootFs.source contains "dm-", we need to mount the devmapper device, create a new dir with the device contents, then unmount the blk dev
 	if strings.Contains(c.rootFs.Source, "dm") {
 		logrus.WithFields(logF).Error("is devmapper, mounting...")
 		logrus.WithFields(logF).WithField("rootFsPath", rootFsPath).Error("")
+		mntCmd := "mount " + "-t " + c.rootFs.Type + " " + c.rootFs.Source + " " + rootFsPath
+		logrus.WithFields(logF).WithField("mntCmd", mntCmd).Error("")
 		mntOut, err := osexec.Command("mount", "-t", c.rootFs.Type, c.rootFs.Source, rootFsPath).CombinedOutput()
 		if err != nil {
 			logrus.WithFields(logF).WithField("mountErr", err.Error()).Error("")
-		} else {
-			c.rootFs.Mounted = true
-			c.rootFs.Target = rootFsPath
-			logrus.WithFields(logF).WithField("mount", string(mntOut)).Error("devmapper device mounted")
+			logrus.WithFields(logF).WithField("mountErr", string(mntOut)).Error("")
+			return &Process{}, errors.New("failed to mount")
 		}
+
+		c.rootFs.Mounted = true
+		c.rootFs.Target = rootFsPath
+		logrus.WithFields(logF).Error("device mounted")
+
+		// copy everything from rootFsPath to newDir
+		newDir := strings.ReplaceAll(rootFsPath, "rootfs", "") + "tmp"
+		logrus.WithFields(logF).WithField("newDir", string(newDir)).Error("")
+		err = CopyDir(rootFsPath, newDir)
+		if err != nil {
+			logrus.WithFields(logF).WithField("cpdir", err.Error()).Error("Err copying1")
+			return &Process{}, errors.New("failed to copy block device content")
+		}
+		logrus.WithFields(logF).Error("copying1 done")
+
+		// unmount dev
+		uMntOut, err := osexec.Command("umount", c.rootFs.Source).CombinedOutput()
+		if err != nil {
+			logrus.WithFields(logF).WithField("unmountErr", err.Error()).Error("")
+			logrus.WithFields(logF).WithField("unmountErr", string(uMntOut)).Error("")
+		}
+		logrus.WithFields(logF).Error("unmount done")
+
+		// rm rootfs in order to copy
+		err = os.RemoveAll(rootFsPath)
+		if err != nil {
+			logrus.WithFields(logF).WithField("rmdir", err.Error()).Error("Err rming")
+		}
+		logrus.WithFields(logF).Error("rming done")
+
+		// copy from newDir to rootfsPath
+		err = CopyDir(newDir, rootFsPath)
+		// err = CopyDir()
+		if err != nil {
+			logrus.WithFields(logF).WithField("cpdir", err.Error()).Error("Err copying2")
+		}
+		logrus.WithFields(logF).Error("copying2 done")
+
+		// rm newDir
+		err = os.RemoveAll(newDir)
+		if err != nil {
+			logrus.WithFields(logF).WithField("rmdir", err.Error()).Error("Err rming")
+		}
+		logrus.WithFields(logF).Error("rming done")
+
+		// pass dev to execData
+		u.ExecData.BlkDevice = c.rootFs.Source
+
+		// .
+		// rootfs
+		// 		unikernel
+		// mnt
+		// 		rootfs
+		// 			unikernel
+		//
+
+		// TODO: remove following lines
+		// newDirFs := newDir + "/rootfs"
+		// logrus.WithFields(logF).WithField("newDirFs", string(newDirFs)).Error("")
+		// logrus.WithFields(logF).WithField("rootFsPath", string(rootFsPath)).Error("")
+		// err = os.MkdirAll(newDirFs, os.ModePerm)
+		// if err != nil {
+		// 	logrus.WithFields(logF).WithField("newDirErr", err.Error()).Error("Err creating new dir")
+		// }
+
+		// //
+		// logrus.WithFields(logF).WithField("newDir", string(newDir)).Error("Created new dir")
+
+		// // chdir to new dir
+		// err = os.Chdir(newDir)
+		// if err != nil {
+		// 	logrus.WithFields(logF).WithField("chdir", err.Error()).Error("Err chdir to new dir")
+		// }
+
 	}
 
 	// Let's find our cwd direct subdirs/files.
@@ -248,7 +335,7 @@ func (u *uruncAgent) createContainer(ctx context.Context, sandbox *Sandbox, c *C
 	}
 
 	// we need to parse the contents of the bundle's rootfs.
-	// if it contains a single /unikernel/binary or /pause we execute that file.
+	// if it containsa  single /unikernel/binary or /pause we execute that file.
 	// if it contains a /unikernel/*.hvt or /unikernel/*.qm file, we must create a cmd string and execute it
 	switch ls2 {
 	case "pause":
@@ -275,6 +362,7 @@ func (u *uruncAgent) createContainer(ctx context.Context, sandbox *Sandbox, c *C
 		} else {
 			u.ExecData.BinaryType = "binary"
 			u.ExecData.BinaryPath = rootFsPath + "/unikernel/" + ls3
+			logrus.WithFields(logF).WithField("bin", u.ExecData.BinaryPath).Error("file to chmod")
 		}
 		logrus.WithFields(logF).WithField("file", u.ExecData.BinaryPath).Error("")
 		logrus.WithFields(logF).WithField("type", u.ExecData.BinaryType).Error("")
@@ -627,3 +715,100 @@ func (u *uruncAgent) resizeGuestVolume(ctx context.Context, volumeGuestPath stri
 // 	//     -append "netdev.ipv4_addr=$IP netdev.ipv4_gw_addr=169.254.1.1 netdev.ipv4_subnet_mask=255.255.255.255 --"
 // 	return qemuCmd
 // }
+
+func CopyFile(src, dst string) (err error) {
+	in, err := os.Open(src)
+	if err != nil {
+		return
+	}
+	defer in.Close()
+
+	out, err := os.Create(dst)
+	if err != nil {
+		return
+	}
+	defer func() {
+		if e := out.Close(); e != nil {
+			err = e
+		}
+	}()
+
+	_, err = io.Copy(out, in)
+	if err != nil {
+		return
+	}
+
+	err = out.Sync()
+	if err != nil {
+		return
+	}
+
+	si, err := os.Stat(src)
+	if err != nil {
+		return
+	}
+	err = os.Chmod(dst, si.Mode())
+	if err != nil {
+		return
+	}
+
+	return
+}
+
+// CopyDir recursively copies a directory tree, attempting to preserve permissions.
+// Source directory must exist, destination directory must *not* exist.
+// Symlinks are ignored and skipped.
+func CopyDir(src string, dst string) (err error) {
+	src = filepath.Clean(src)
+	dst = filepath.Clean(dst)
+
+	si, err := os.Stat(src)
+	if err != nil {
+		return err
+	}
+	if !si.IsDir() {
+		return fmt.Errorf("source is not a directory")
+	}
+
+	_, err = os.Stat(dst)
+	if err != nil && !os.IsNotExist(err) {
+		return
+	}
+	if err == nil {
+		return fmt.Errorf("destination already exists")
+	}
+
+	err = os.MkdirAll(dst, si.Mode())
+	if err != nil {
+		return
+	}
+
+	entries, err := ioutil.ReadDir(src)
+	if err != nil {
+		return
+	}
+
+	for _, entry := range entries {
+		srcPath := filepath.Join(src, entry.Name())
+		dstPath := filepath.Join(dst, entry.Name())
+
+		if entry.IsDir() {
+			err = CopyDir(srcPath, dstPath)
+			if err != nil {
+				return
+			}
+		} else {
+			// Skip symlinks.
+			if entry.Mode()&os.ModeSymlink != 0 {
+				continue
+			}
+
+			err = CopyFile(srcPath, dstPath)
+			if err != nil {
+				return
+			}
+		}
+	}
+
+	return
+}

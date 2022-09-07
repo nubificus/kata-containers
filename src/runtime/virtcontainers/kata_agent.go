@@ -294,6 +294,10 @@ func (k *kataAgent) GetExecData() ExecData {
 	return ExecData{}
 }
 
+func (k *kataAgent) Name() string {
+	return "kata"
+}
+
 func (k *kataAgent) longLiveConn() bool {
 	return k.keepConn
 }
