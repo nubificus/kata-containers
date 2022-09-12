@@ -23,7 +23,7 @@ type HvtArgsNetwork struct {
 	Method string `json:"method"`
 	Addr   string `json:"addr"`
 	Mask   string `json:"mask"`
-	// Gw     string `json:"gw"`
+	Gw     string `json:"gw"`
 }
 
 type HvtArgsBlock struct {
@@ -36,7 +36,7 @@ type HvtArgsBlock struct {
 type HvtArgs struct {
 	Cmdline string         `json:"cmdline"`
 	Net     HvtArgsNetwork `json:"net"`
-	Blk     *HvtArgsBlock  `json:"blk,omitempty"`
+	Blk     HvtArgsBlock   `json:"blk,omitempty"`
 	Env     []string       `json:"env,omitempty"`
 	Cwd     string         `json:"cwd,omitempty"`
 	Mem     string         `json:"mem,omitempty"`
@@ -94,7 +94,7 @@ func HvtCmd(execData virtcontainers.ExecData) string {
 	logrus.WithFields(logF).WithField("NetNs1", execData.NetNs).Error("")
 	logrus.WithFields(logF).WithField("NetNs2", ns).Error("")
 
-	HvtMonitor := "/home/gntouts/bin/solo5-hvt"
+	HvtMonitor := "/opt/kata/bin/solo5-hvt"
 	// ./tenders/hvt/solo5-hvt --net:service0=tap192  tests/test_net/test_net.hvt
 	// return HvtMonitor + "--net:service0=" + execData.Tap + " " + execData.BinaryPath
 	// /solo5-hvt --net=tap100 -- redis.hvt '{"cmdline":"redis-server","net":{"if":"ukvmif0","cloner":"True","type":"inet","method":"static","addr":"10.10.10.2","mask":"16"}}'
@@ -104,20 +104,36 @@ func HvtCmd(execData virtcontainers.ExecData) string {
 		Cloner: "True",
 		Type:   "inet",
 		Method: "static",
-		Addr:   "10.10.10.2",
-		Mask:   "16",
+		Addr:   execData.IPAddress,
+		Mask:   "1",
+		Gw:   execData.Gateway,
+	}
+
+	hvtBlock := HvtArgsBlock{
+		Source:	"etfs",
+		Path:	"/dev/ld0a",
+		Fstype:	"blk",
+		Mount:	"/data",
 	}
 
 	hvtArgs := HvtArgs{
 		Cmdline: "redis-server",
 		Net:     hvtNet,
+		Blk:     hvtBlock,
 	}
+
 	b, _ := json.Marshal(hvtArgs)
 	cmdString := ""
-	if execData.BlkDevice != "" {
-		cmdString = "ip netns exec " + ns + " " + HvtMonitor + " --net=" + execData.Tap + " --disk=" + execData.BlkDevice + " " + execData.BinaryPath + " " + string(b)
+	nsString := ""
+	if ns != "" {
+		nsString = "ip netns exec " + ns + " "
 	} else {
-		cmdString = "ip netns exec " + ns + " " + HvtMonitor + " --net=" + execData.Tap + " " + execData.BinaryPath + " " + string(b)
+		nsString = ""
+	}
+	if execData.BlkDevice != "" {
+		cmdString = nsString + HvtMonitor + " --net=" + execData.Tap + " --disk=" + execData.BlkDevice + " " + execData.BinaryPath + " " + string(b)
+	} else {
+		cmdString = nsString + HvtMonitor + " --net=" + execData.Tap + " " + execData.BinaryPath + " " + string(b)
 	}
 
 	// stripped := strings.Replace(cmdString, "\\", "", -1)
@@ -126,6 +142,7 @@ func HvtCmd(execData virtcontainers.ExecData) string {
 	// if err != nil {
 	// 	logrus.WithFields(logF).WithField("err", err.Error()).Error("")
 	// }
+	logrus.WithFields(logF).WithField("cmdline", string(b)).Error("")
 	logrus.WithFields(logF).WithField("cmd", cmdString).Error("")
 	// cmdParts := strings.Split(stripped, " ")
 

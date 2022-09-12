@@ -23,6 +23,7 @@ create_dockerfile () {
     cat <<EOF >./Dockerfile
 FROM scratch
 COPY $1 /unikernel/
+COPY $2 /
 EOF
 }
 
@@ -78,7 +79,7 @@ check_dependencies() {
 
 check_dependencies
 
-while getopts ":hu:i:c" option; do
+while getopts ":hu:i:ce:" option; do
     case $option in
     h) # display Help
         display_help
@@ -87,6 +88,7 @@ while getopts ":hu:i:c" option; do
     u) unikernel=${OPTARG} ;;
     i) image=${OPTARG} ;;
     c) clean="true" ;;
+    e) extrafile=${OPTARG} ;;
     :) # If expected argument omitted:
         echo "Error: -${OPTARG} requires an argument."
         echo "Try '$0 -h' for more information."
@@ -113,7 +115,7 @@ else
     image="$image:latest "
 fi
 
-create_dockerfile $unikernel
+create_dockerfile $unikernel $extrafile
 build_docker_image $image
 export_docker_image $image
 delete_dockerfile

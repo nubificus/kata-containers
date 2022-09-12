@@ -337,6 +337,11 @@ func (u *uruncAgent) createContainer(ctx context.Context, sandbox *Sandbox, c *C
 	// we need to parse the contents of the bundle's rootfs.
 	// if it containsa  single /unikernel/binary or /pause we execute that file.
 	// if it contains a /unikernel/*.hvt or /unikernel/*.qm file, we must create a cmd string and execute it
+	if strings.Contains(ls2, "unikernel") {
+		ls2 = "unikernel"
+	} else if strings.Contains(ls2, "pause") {
+		ls2 = "pause"
+	}
 	switch ls2 {
 	case "pause":
 		u.ExecData.BinaryType = "pause"
