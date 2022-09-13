@@ -194,6 +194,7 @@ func (u *uruncAgent) createContainer(ctx context.Context, sandbox *Sandbox, c *C
 	} else {
 		logrus.WithFields(logF).WithField("cwd", string(cwdPath)).Error("")
 	}
+	// Remove whitespaces
 	cwdPath = strings.ReplaceAll(cwdPath, " ", "")
 	cwdPath = strings.TrimSpace(cwdPath)
 
@@ -203,18 +204,6 @@ func (u *uruncAgent) createContainer(ctx context.Context, sandbox *Sandbox, c *C
 		cwdPath = strings.ReplaceAll(cwdPath, sandbox.ID(), c.ID())
 		lsPrefix = cwdPath
 	}
-
-	// Mount device if needed and parse rootfs for binary
-
-	// The expected file structure is:
-	// .
-	// ..
-	// address
-	// config.json
-	// rootfs
-	// shim-binary-path
-	// shim.pid
-	// work
 
 	// Our rootfs path
 	rootFsPath := cwdPath + "/" + c.rootfsSuffix
@@ -228,152 +217,118 @@ func (u *uruncAgent) createContainer(ctx context.Context, sandbox *Sandbox, c *C
 	}
 	logrus.WithFields(logF).WithFields(tempFields).Error("rootfs info")
 
-	// If c.rootFs.source contains "dm-", we need to mount the devmapper device, create a new dir with the device contents, then unmount the blk dev
+	// check if is devmapper
 	if strings.Contains(c.rootFs.Source, "dm") {
-		logrus.WithFields(logF).Error("is devmapper, mounting...")
-		logrus.WithFields(logF).WithField("rootFsPath", rootFsPath).Error("")
-		mntCmd := "mount " + "-t " + c.rootFs.Type + " " + c.rootFs.Source + " " + rootFsPath
-		logrus.WithFields(logF).WithField("mntCmd", mntCmd).Error("")
+		u.ExecData.BlkDevice = c.rootFs.Source
+	} else {
+		u.ExecData.BlkDevice = ""
+	}
+
+	// if it is, mount it
+	if u.ExecData.BlkDevice != "" {
 		mntOut, err := osexec.Command("mount", "-t", c.rootFs.Type, c.rootFs.Source, rootFsPath).CombinedOutput()
 		if err != nil {
 			logrus.WithFields(logF).WithField("mountErr", err.Error()).Error("")
 			logrus.WithFields(logF).WithField("mountErr", string(mntOut)).Error("")
 			return &Process{}, errors.New("failed to mount")
 		}
-
 		c.rootFs.Mounted = true
 		c.rootFs.Target = rootFsPath
 		logrus.WithFields(logF).Error("device mounted")
-
-		// copy everything from rootFsPath to newDir
-		newDir := strings.ReplaceAll(rootFsPath, "rootfs", "") + "tmp"
-		logrus.WithFields(logF).WithField("newDir", string(newDir)).Error("")
-		err = CopyDir(rootFsPath, newDir)
-		if err != nil {
-			logrus.WithFields(logF).WithField("cpdir", err.Error()).Error("Err copying1")
-			return &Process{}, errors.New("failed to copy block device content")
-		}
-		logrus.WithFields(logF).Error("copying1 done")
-
-		// unmount dev
-		uMntOut, err := osexec.Command("umount", c.rootFs.Source).CombinedOutput()
-		if err != nil {
-			logrus.WithFields(logF).WithField("unmountErr", err.Error()).Error("")
-			logrus.WithFields(logF).WithField("unmountErr", string(uMntOut)).Error("")
-		}
-		logrus.WithFields(logF).Error("unmount done")
-
-		// rm rootfs in order to copy
-		err = os.RemoveAll(rootFsPath)
-		if err != nil {
-			logrus.WithFields(logF).WithField("rmdir", err.Error()).Error("Err rming")
-		}
-		logrus.WithFields(logF).Error("rming done")
-
-		// copy from newDir to rootfsPath
-		err = CopyDir(newDir, rootFsPath)
-		// err = CopyDir()
-		if err != nil {
-			logrus.WithFields(logF).WithField("cpdir", err.Error()).Error("Err copying2")
-		}
-		logrus.WithFields(logF).Error("copying2 done")
-
-		// rm newDir
-		err = os.RemoveAll(newDir)
-		if err != nil {
-			logrus.WithFields(logF).WithField("rmdir", err.Error()).Error("Err rming")
-		}
-		logrus.WithFields(logF).Error("rming done")
-
-		// pass dev to execData
-		u.ExecData.BlkDevice = c.rootFs.Source
-
-		// .
-		// rootfs
-		// 		unikernel
-		// mnt
-		// 		rootfs
-		// 			unikernel
-		//
-
-		// TODO: remove following lines
-		// newDirFs := newDir + "/rootfs"
-		// logrus.WithFields(logF).WithField("newDirFs", string(newDirFs)).Error("")
-		// logrus.WithFields(logF).WithField("rootFsPath", string(rootFsPath)).Error("")
-		// err = os.MkdirAll(newDirFs, os.ModePerm)
-		// if err != nil {
-		// 	logrus.WithFields(logF).WithField("newDirErr", err.Error()).Error("Err creating new dir")
-		// }
-
-		// //
-		// logrus.WithFields(logF).WithField("newDir", string(newDir)).Error("Created new dir")
-
-		// // chdir to new dir
-		// err = os.Chdir(newDir)
-		// if err != nil {
-		// 	logrus.WithFields(logF).WithField("chdir", err.Error()).Error("Err chdir to new dir")
-		// }
-
 	}
 
-	// Let's find our cwd direct subdirs/files.
-	ls1Out, err := osexec.Command("ls", lsPrefix).Output()
-	ls1 := cleanLsRes(string(ls1Out))
-	if err != nil {
-		logrus.WithFields(logF).WithField("ls1err", err.Error()).Error("")
-	} else {
-		logrus.WithFields(logF).WithField("ls1", ls1).Error("")
-	}
-
-	// Our cwd had a ./rootfs subdir. Let's have a closer look:
-	ls2Out, err := osexec.Command("ls", lsPrefix+"/rootfs").Output()
-	ls2 := cleanLsRes(string(ls2Out))
+	// check if pause
+	lsCmd, err := osexec.Command("ls", lsPrefix+"/rootfs").Output()
+	lsRes := cleanLsRes(string(lsCmd))
 	if err != nil {
 		logrus.WithFields(logF).WithField("ls2err", err.Error()).Error("")
 	} else {
-		logrus.WithFields(logF).WithField("ls2", ls2).Error("")
+		logrus.WithFields(logF).WithField("ls2", lsRes).Error("")
 	}
 
-	// we need to parse the contents of the bundle's rootfs.
-	// if it containsa  single /unikernel/binary or /pause we execute that file.
-	// if it contains a /unikernel/*.hvt or /unikernel/*.qm file, we must create a cmd string and execute it
-	if strings.Contains(ls2, "unikernel") {
-		ls2 = "unikernel"
-	} else if strings.Contains(ls2, "pause") {
-		ls2 = "pause"
-	}
-	switch ls2 {
-	case "pause":
+	// if is pause, don't unmount and return
+	if strings.Contains(lsRes, "pause") {
 		u.ExecData.BinaryType = "pause"
 		u.ExecData.BinaryPath = rootFsPath + "/pause"
 		logrus.WithFields(logF).WithField("file", u.ExecData.BinaryPath).Error("")
 		logrus.WithFields(logF).WithField("type", u.ExecData.BinaryType).Error("")
-	case "unikernel":
-		ls3out, err := osexec.Command("ls", lsPrefix+"/rootfs/unikernel").Output()
-		ls3 := cleanLsRes(string(ls3out))
-		if err != nil {
-			logrus.WithFields(logF).WithField("ls3err", err.Error()).Error("")
-		} else {
-			logrus.WithFields(logF).WithField("ls3", ls3).Error("")
-		}
+		return &Process{}, nil
+	}
 
-		// now let's check if ".hvt" or not
-		if strings.Contains(ls3, ".hvt") {
-			u.ExecData.BinaryType = "hvt"
-			u.ExecData.BinaryPath = rootFsPath + "/unikernel/" + ls3
-		} else if strings.Contains(ls3, ".qm") {
-			u.ExecData.BinaryType = "qemu"
-			u.ExecData.BinaryPath = rootFsPath + "/unikernel/" + ls3
-		} else {
-			u.ExecData.BinaryType = "binary"
-			u.ExecData.BinaryPath = rootFsPath + "/unikernel/" + ls3
-			logrus.WithFields(logF).WithField("bin", u.ExecData.BinaryPath).Error("file to chmod")
-		}
-		logrus.WithFields(logF).WithField("file", u.ExecData.BinaryPath).Error("")
+	// check if image is supported and populate execData
+	if strings.Contains(lsRes, "unikernel") {
 		logrus.WithFields(logF).WithField("type", u.ExecData.BinaryType).Error("")
-	default:
+		lsCmd, err := osexec.Command("ls", lsPrefix+"/rootfs/unikernel").Output()
+		lsRes := cleanLsRes(string(lsCmd))
+		if err != nil {
+			logrus.WithFields(logF).WithField("ls2err", err.Error()).Error("")
+		} else {
+			logrus.WithFields(logF).WithField("ls2", lsRes).Error("")
+		}
+		u.ExecData.BinaryPath = rootFsPath + "/unikernel/" + lsRes
+
+	} else {
+		// image not compatible
 		return &Process{}, errors.New("requested image not supported")
 	}
+
+	// check file type and populate
+	if strings.Contains(u.ExecData.BinaryPath, ".hvt") {
+		u.ExecData.BinaryType = "hvt"
+	} else if strings.Contains(u.ExecData.BinaryPath, ".qm") {
+		u.ExecData.BinaryType = "qemu"
+	} else {
+		// if type is binary return
+		u.ExecData.BinaryType = "binary"
+		return &Process{}, nil
+	}
+
+	// at this point, image is valid and type is qm or hvt
+	// so we need to copy files from blk device and unmount
+
+	// copy everything from rootFsPath to newDir
+	newDir := strings.ReplaceAll(rootFsPath, "rootfs", "") + "tmp"
+	logrus.WithFields(logF).WithField("newDir", string(newDir)).Error("")
+	err = CopyDir(rootFsPath, newDir)
+	if err != nil {
+		logrus.WithFields(logF).WithField("cpdir", err.Error()).Error("Err copying1")
+		return &Process{}, errors.New("failed to copy block device content")
+	}
+	logrus.WithFields(logF).Error("copying1 done")
+
+	// unmount dev
+	uMntOut, err := osexec.Command("umount", c.rootFs.Source).CombinedOutput()
+	if err != nil {
+		logrus.WithFields(logF).WithField("unmountErr", err.Error()).Error("")
+		logrus.WithFields(logF).WithField("unmountErr", string(uMntOut)).Error("")
+	}
+	logrus.WithFields(logF).Error("unmount done")
+
+	// rm rootfs in order to copy
+	err = os.RemoveAll(rootFsPath)
+	if err != nil {
+		logrus.WithFields(logF).WithField("rmdir", err.Error()).Error("Err rming")
+	}
+	logrus.WithFields(logF).Error("rming done")
+
+	// copy from newDir to rootfsPath
+	err = CopyDir(newDir, rootFsPath)
+	// err = CopyDir()
+	if err != nil {
+		logrus.WithFields(logF).WithField("cpdir", err.Error()).Error("Err copying2")
+	}
+	logrus.WithFields(logF).Error("copying2 done")
+
+	// rm newDir
+	err = os.RemoveAll(newDir)
+	if err != nil {
+		logrus.WithFields(logF).WithField("rmdir", err.Error()).Error("Err rming")
+	}
+	logrus.WithFields(logF).Error("rming done")
+
+	// pass device to execData
+	u.ExecData.BlkDevice = c.rootFs.Source
+
 	return &Process{}, nil
 }
 
