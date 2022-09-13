@@ -220,12 +220,6 @@ func (u *uruncAgent) createContainer(ctx context.Context, sandbox *Sandbox, c *C
 	// check if is devmapper
 	if strings.Contains(c.rootFs.Source, "dm") {
 		u.ExecData.BlkDevice = c.rootFs.Source
-	} else {
-		u.ExecData.BlkDevice = ""
-	}
-
-	// if it is, mount it
-	if u.ExecData.BlkDevice != "" {
 		mntOut, err := osexec.Command("mount", "-t", c.rootFs.Type, c.rootFs.Source, rootFsPath).CombinedOutput()
 		if err != nil {
 			logrus.WithFields(logF).WithField("mountErr", err.Error()).Error("")
