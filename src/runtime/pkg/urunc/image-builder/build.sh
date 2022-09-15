@@ -8,14 +8,14 @@ clean="0"
 display_help() {
     echo "Build an OCI container image containing only the unikernel binary."
     echo
-    echo "Syntax: $0 [-u|-i|-c|-h]"
+    echo "Syntax: $0 [-u|-i|-e|-c|-h]"
     echo "---------------------"
     echo "Usage:"
-    echo
-    echo "  -u  BINARY   Specify the unikernel binary you want to package."
-    echo "  -i  IMAGE    Specify the name of the image you want to create."
-    echo "  -c           If set, the script will delete the .tar of the bundle after importing to ctr."
-    echo "  -h           Print this help."
+    echo "  -u  BINARY      Specify the unikernel binary you want to package. [REQUIRED]"
+    echo "  -i  IMAGE       Specify the name of the image you want to create. [REQUIRED]"
+    echo "  -e  EXTRAFILE   Specify the name of the extra file you want to include in the container image. [OPTIONAL]"
+    echo "  -c              If set, the script will delete the .tar of the bundle after importing to ctr."
+    echo "  -h              Print this help."
 }
 
 create_dockerfile () {
