@@ -158,6 +158,20 @@ impl DeviceManager {
         ))
     }
 
+    pub async fn get_driver_options(&self, device_id: &str) -> Option<String> {
+        if let Some(dev) = self.devices.get(device_id) {
+            return dev.lock().await.device_driver().await;
+        }
+        None
+    }
+
+    pub async fn get_device_guest_path(&self, device_id: &str) -> Option<String> {
+        if let Some(device) = self.devices.get(device_id) {
+            return device.lock().await.get_device_guest_path().await;
+        }
+        None
+    }
+
     async fn find_device(
         &self,
         major: i64,

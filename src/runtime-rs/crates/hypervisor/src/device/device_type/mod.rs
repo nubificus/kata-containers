@@ -25,7 +25,7 @@ pub use vsock::{HybridVsockConfig, VsockConfig};
 mod generic;
 pub use generic::{GenericConfig, GenericDevice};
 use std::fmt;
-pub mod vhost_user_device;
+pub mod vhost_user;
 
 #[derive(Debug)]
 pub enum DeviceConfig {
@@ -68,6 +68,8 @@ pub trait Device: Send + Sync {
     async fn get_host_path(&self) -> &str;
     // get the bus device function id of device
     async fn get_bdf(&self) -> Option<String>;
+    // get the virt path of the device
+    async fn get_virt_path(&self) -> Option<String>;
     // get_attach_count returns how many times the device has been attached
     async fn get_attach_count(&self) -> u64;
     // increase_attach_count is used to increase the attach count for a device
@@ -82,4 +84,6 @@ pub trait Device: Send + Sync {
     async fn decrease_attach_count(&mut self) -> Result<bool>;
     // get the device driver type
     async fn device_driver(&self) -> Option<String>;
+    // get the device guest path
+    async fn get_device_guest_path(&self) -> Option<String>;
 }

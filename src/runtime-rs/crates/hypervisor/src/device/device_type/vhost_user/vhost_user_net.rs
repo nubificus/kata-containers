@@ -12,14 +12,14 @@ use crate::device_type::{Device, DeviceArgument, GenericDevice};
 use super::VhostUserConfig;
 use anyhow::Result;
 
-// VhostUserFSDevice is a virtio-fs vhost-user device
-pub struct VhostUserFsDevice {
+// VhostUserNetDevice is a network vhost-user based device
+pub struct VhostUserNetDevice {
     _drive: VhostUserConfig,
     _base: GenericDevice,
 }
 
 #[async_trait]
-impl Device for VhostUserFsDevice {
+impl Device for VhostUserNetDevice {
     async fn attach(&mut self, _h: &dyn hypervisor, _da: DeviceArgument) -> Result<()> {
         todo!()
     }
@@ -52,6 +52,10 @@ impl Device for VhostUserFsDevice {
         todo!()
     }
 
+    async fn get_virt_path(&self) -> Option<String> {
+        todo!()
+    }
+
     async fn get_attach_count(&self) -> u64 {
         todo!()
     }
@@ -65,6 +69,10 @@ impl Device for VhostUserFsDevice {
     }
 
     async fn device_driver(&self) -> Option<String> {
+        todo!()
+    }
+
+    async fn get_device_guest_path(&self) -> Option<String> {
         todo!()
     }
 }

@@ -97,7 +97,11 @@ impl Device for VfioDevice {
     }
 
     async fn get_bdf(&self) -> Option<String> {
-        todo!()
+        self._base.get_bdf().await
+    }
+
+    async fn get_virt_path(&self) -> Option<String> {
+        None
     }
 
     async fn get_attach_count(&self) -> u64 {
@@ -114,6 +118,10 @@ impl Device for VfioDevice {
 
     async fn device_driver(&self) -> Option<String> {
         todo!()
+    }
+
+    async fn get_device_guest_path(&self) -> Option<String> {
+        self.get_bdf().await
     }
 }
 

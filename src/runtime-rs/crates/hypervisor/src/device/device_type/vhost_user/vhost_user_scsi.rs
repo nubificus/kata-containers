@@ -52,6 +52,10 @@ impl Device for VhostUserScsiDevice {
         todo!()
     }
 
+    async fn get_virt_path(&self) -> Option<String> {
+        todo!()
+    }
+
     async fn get_attach_count(&self) -> u64 {
         todo!()
     }
@@ -65,6 +69,10 @@ impl Device for VhostUserScsiDevice {
     }
 
     async fn device_driver(&self) -> Option<String> {
+        todo!()
+    }
+
+    async fn get_device_guest_path(&self) -> Option<String> {
         todo!()
     }
 }

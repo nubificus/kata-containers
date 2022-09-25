@@ -96,12 +96,10 @@ impl Device for GenericDevice {
     async fn device_id(&self) -> &str {
         self.id.as_str()
     }
-
     async fn set_device_info(&mut self, device_info: GenericConfig) -> Result<()> {
         self.generic_config = device_info;
         Ok(())
     }
-
     async fn get_device_info(&self) -> Result<GenericConfig> {
         Ok(self.generic_config.clone())
     }
@@ -116,6 +114,10 @@ impl Device for GenericDevice {
 
     async fn get_bdf(&self) -> Option<String> {
         self.generic_config.bdf.clone()
+    }
+
+    async fn get_virt_path(&self) -> Option<String> {
+        self.generic_config.virt_path.clone()
     }
 
     async fn get_attach_count(&self) -> u64 {
@@ -153,6 +155,10 @@ impl Device for GenericDevice {
     }
 
     async fn device_driver(&self) -> Option<String> {
+        None
+    }
+
+    async fn get_device_guest_path(&self) -> Option<String> {
         None
     }
 }

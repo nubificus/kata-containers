@@ -95,11 +95,9 @@ impl Device for VirtioBlkDevice {
     async fn device_id(&self) -> &str {
         self.base.device_id().await
     }
-
     async fn set_device_info(&mut self, device_info: GenericConfig) -> Result<()> {
         self.base.set_device_info(device_info).await
     }
-
     async fn get_device_info(&self) -> Result<GenericConfig> {
         self.base.get_device_info().await
     }
@@ -113,7 +111,11 @@ impl Device for VirtioBlkDevice {
     }
 
     async fn get_bdf(&self) -> Option<String> {
-        self.base.get_bdf().await
+        None
+    }
+
+    async fn get_virt_path(&self) -> Option<String> {
+        self.base.get_virt_path().await
     }
 
     async fn get_attach_count(&self) -> u64 {
@@ -130,5 +132,9 @@ impl Device for VirtioBlkDevice {
 
     async fn device_driver(&self) -> Option<String> {
         Some(self.virtio_blk_driver.clone())
+    }
+
+    async fn get_device_guest_path(&self) -> Option<String> {
+        self.get_virt_path().await
     }
 }
