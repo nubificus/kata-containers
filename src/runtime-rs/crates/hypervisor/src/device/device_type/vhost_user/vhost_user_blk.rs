@@ -74,4 +74,8 @@ impl Device for VhostUserBlkDevice {
     async fn get_device_guest_path(&self) -> Option<String> {
         todo!()
     }
+
+    async fn get_device_vm_path(&self) -> Option<String> {
+        todo!()
+    }
 }

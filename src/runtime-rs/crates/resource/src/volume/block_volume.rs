@@ -11,7 +11,6 @@ use std::{collections::HashMap, fs, path::Path, sync::Arc};
 use crate::share_fs::{do_get_guest_path, do_get_host_path};
 
 use super::{share_fs_volume::generate_mount_path, Volume};
-use agent::Storage;
 use anyhow::{anyhow, Context};
 use hypervisor::{device_manager::DeviceManager, device_type::GenericConfig};
 use nix::sys::stat::{self, SFlag};
@@ -66,22 +65,20 @@ impl BlockVolume {
             .map_err(|e| anyhow!("failed to create rootfs dir {}: {:?}", host_path, e))?;
 
         // storage
-        let mut storage = Storage::default();
-
-        storage.driver = d
-            .read()
-            .await
-            .get_driver_options(&device_id)
-            .await
-            .context("failed to get driver options")?;
-
-        storage.options = if read_only {
-            vec!["ro".to_string()]
-        } else {
-            Vec::new()
+        let mut storage = agent::Storage {
+            driver: d
+                .read()
+                .await
+                .get_driver_options(&device_id)
+                .await
+                .context("failed to get driver options")?,
+            options: if read_only {
+                vec!["ro".to_string()]
+            } else {
+                Vec::new()
+            },
+            ..Default::default()
         };
-
-        storage.mount_point = guest_path.clone();
 
         if let Some(path) = d
             .read()

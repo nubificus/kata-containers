@@ -161,6 +161,10 @@ impl Device for GenericDevice {
     async fn get_device_guest_path(&self) -> Option<String> {
         None
     }
+
+    async fn get_device_vm_path(&self) -> Option<String> {
+        None
+    }
 }
 
 #[cfg(test)]

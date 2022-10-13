@@ -7,13 +7,14 @@
 use std::{sync::Arc, thread};
 
 use crate::{network::NetworkConfig, resource_persist::ResourceState};
+use agent::types::Device;
 use agent::{Agent, Storage};
 use anyhow::{anyhow, Context, Ok, Result};
 use async_trait::async_trait;
 use hypervisor::{device::device_manager::DeviceManager, Hypervisor};
 use kata_types::config::TomlConfig;
 use kata_types::mount::Mount;
-use oci::LinuxResources;
+use oci::{Linux, LinuxResources};
 use persist::sandbox_persist::Persist;
 use tokio::runtime;
 use tokio::sync::RwLock;
@@ -245,6 +246,54 @@ impl ResourceManagerInner {
                 &self.sid,
             )
             .await
+    }
+
+    pub async fn handler_devices(&self, _cid: &str, linux: &Linux) -> Result<Vec<Device>> {
+        let mut devices_agent = vec![];
+        for d in linux.devices.iter() {
+            // generate device config from oci spec
+            let mut device_config = self
+                .device_manager
+                .read()
+                .await
+                .generate_device_config_from_oci(d, None)
+                .context("failed to generate device config from oci spec")?;
+
+            // try attach device
+            let device_id = self
+                .device_manager
+                .write()
+                .await
+                .try_add_device(&mut device_config)
+                .await
+                .context("failed to add device")?;
+
+            // create agent device
+            let mut agent_device = Device {
+                id: device_id.clone(),
+                container_path: device_config.container_path.clone(),
+                ..Default::default()
+            };
+
+            agent_device.field_type = self
+                .device_manager
+                .read()
+                .await
+                .get_driver_options(&device_id)
+                .await
+                .context("failed to get driver options")?;
+
+            agent_device.vm_path = self
+                .device_manager
+                .read()
+                .await
+                .get_device_vm_path(&device_id)
+                .await
+                .context("failed to get driver options")?;
+
+            devices_agent.push(agent_device);
+        }
+        Ok(devices_agent)
     }
 
     pub async fn update_cgroups(

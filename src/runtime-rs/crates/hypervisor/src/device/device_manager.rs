@@ -158,6 +158,47 @@ impl DeviceManager {
         ))
     }
 
+    pub fn generate_device_config_from_oci(
+        &self,
+        device: &oci::LinuxDevice,
+        bdf: Option<String>,
+    ) -> Result<GenericConfig> {
+        info!(sl!(), "Linux device info: {:?}", device);
+        // b      block (buffered) special file
+        // c, u   character (unbuffered) special file
+        // p      FIFO
+        // refer to https://man7.org/linux/man-pages/man1/mknod.1.html
+        let allow_device_type: Vec<&str> = vec!["c", "b", "u", "p"];
+
+        if !allow_device_type.contains(&device.r#type.as_str()) {
+            return Err(anyhow!("runtime not support device type {}", device.r#type));
+        }
+
+        if device.path.is_empty() {
+            return Err(anyhow!("container path can not be empty"));
+        }
+
+        let file_mode = device.file_mode.unwrap_or(0);
+        let uid = device.uid.unwrap_or(0);
+        let gid = device.gid.unwrap_or(0);
+
+        let dev_info = GenericConfig {
+            host_path: String::new(),
+            container_path: device.path.clone(),
+            dev_type: device.r#type.clone(),
+            major: device.major,
+            minor: device.minor,
+            file_mode,
+            uid,
+            gid,
+            id: "".to_string(),
+            bdf,
+            driver_options: HashMap::new(),
+            ..Default::default()
+        };
+        Ok(dev_info)
+    }
+
     pub async fn get_driver_options(&self, device_id: &str) -> Option<String> {
         if let Some(dev) = self.devices.get(device_id) {
             return dev.lock().await.device_driver().await;
@@ -168,6 +209,13 @@ impl DeviceManager {
     pub async fn get_device_guest_path(&self, device_id: &str) -> Option<String> {
         if let Some(device) = self.devices.get(device_id) {
             return device.lock().await.get_device_guest_path().await;
+        }
+        None
+    }
+
+    pub async fn get_device_vm_path(&self, device_id: &str) -> Option<String> {
+        if let Some(device) = self.devices.get(device_id) {
+            return device.lock().await.get_device_vm_path().await;
         }
         None
     }

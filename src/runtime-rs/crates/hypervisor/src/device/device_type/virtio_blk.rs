@@ -111,7 +111,7 @@ impl Device for VirtioBlkDevice {
     }
 
     async fn get_bdf(&self) -> Option<String> {
-        None
+        self.base.get_bdf().await
     }
 
     async fn get_virt_path(&self) -> Option<String> {
@@ -136,5 +136,14 @@ impl Device for VirtioBlkDevice {
 
     async fn get_device_guest_path(&self) -> Option<String> {
         self.get_virt_path().await
+    }
+
+    async fn get_device_vm_path(&self) -> Option<String> {
+        match self.virtio_blk_driver.as_str() {
+            KATA_MMIO_BLK_DEV_TYPE => self.get_virt_path().await,
+            // if we are using virtio-blk-pci, agent will use device id to find the pcipath, vm path will be useless
+            KATA_BLK_DEV_TYPE => None,
+            _ => None,
+        }
     }
 }

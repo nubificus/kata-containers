@@ -86,4 +86,6 @@ pub trait Device: Send + Sync {
     async fn device_driver(&self) -> Option<String>;
     // get the device guest path
     async fn get_device_guest_path(&self) -> Option<String>;
+    // get the device vm path
+    async fn get_device_vm_path(&self) -> Option<String>;
 }

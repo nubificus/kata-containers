@@ -123,6 +123,10 @@ impl Device for VfioDevice {
     async fn get_device_guest_path(&self) -> Option<String> {
         self.get_bdf().await
     }
+
+    async fn get_device_vm_path(&self) -> Option<String> {
+        todo!()
+    }
 }
 
 /// binds the device to vfio driver after unbinding from host.
