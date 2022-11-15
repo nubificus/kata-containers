@@ -88,6 +88,10 @@ type hypervisor struct {
 	Firmware                       string                    `toml:"firmware"`
 	FirmwareVolume                 string                    `toml:"firmware_volume"`
 	MachineAccelerators            string                    `toml:"machine_accelerators"`
+	VaccelPath                     string                    `toml:"vaccel_path"`
+	VaccelVsockPort                uint32                    `toml:"vaccel_vsock_port"`
+	VaccelHostBackends             string                    `toml:"vaccel_host_backends"`
+	VaccelGuestBackend             string                    `toml:"vaccel_guest_backend"`
 	CPUFeatures                    string                    `toml:"cpu_features"`
 	KernelParams                   string                    `toml:"kernel_params"`
 	MachineType                    string                    `toml:"machine_type"`
@@ -341,6 +345,24 @@ func (h hypervisor) machineAccelerators() string {
 	machineAccelerators = strings.Trim(machineAccelerators, ",")
 
 	return machineAccelerators
+}
+
+func (h hypervisor) vaccelVsockPort() uint32 {
+       port := h.VaccelVsockPort
+       if port == 0 {
+               port = defaultVaccelPort
+       }
+
+       return port
+}
+
+func (h hypervisor) vaccelHostBackends() string {
+
+       if h.VaccelHostBackends == "" {
+               return defaultVaccelHostBackend
+       }
+
+       return h.VaccelHostBackends
 }
 
 func (h hypervisor) cpuFeatures() string {
@@ -700,6 +722,7 @@ func newFirecrackerHypervisorConfig(h hypervisor) (vc.HypervisorConfig, error) {
 		return vc.HypervisorConfig{}, err
 	}
 
+	machineAccelerators := h.machineAccelerators()
 	kernelParams := h.kernelParams()
 
 	blockDriver, err := h.blockDeviceDriver()
@@ -721,6 +744,11 @@ func newFirecrackerHypervisorConfig(h hypervisor) (vc.HypervisorConfig, error) {
 		RootfsType:            rootfsType,
 		FirmwarePath:          firmware,
 		KernelParams:          vc.DeserializeParams(vc.KernelParamFields(kernelParams)),
+		MachineAccelerators:   machineAccelerators,
+		VaccelPath:            h.VaccelPath,
+		VaccelVsockPort:       h.vaccelVsockPort(),
+		VaccelHostBackends:    h.vaccelHostBackends(),
+		VaccelGuestBackend:    h.VaccelGuestBackend,
 		NumVCPUs:              h.defaultVCPUs(),
 		DefaultMaxVCPUs:       h.defaultMaxVCPUs(),
 		MemorySize:            h.defaultMemSz(),
