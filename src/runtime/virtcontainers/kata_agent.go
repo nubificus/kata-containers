@@ -1327,7 +1327,6 @@ func (k *kataAgent) createContainer(ctx context.Context, sandbox *Sandbox, c *Co
 	err = k.constrainGRPCSpec(grpcSpec, passSeccomp, sandbox.config.HypervisorConfig.DisableGuestSeLinux, sandbox.config.GuestSeLinuxLabel, sandbox.config.VfioMode == config.VFIOModeGuestKernel)
 	if err != nil {
 		return nil, err
-	}
 
 	req := &grpc.CreateContainerRequest{
 		ContainerId:  c.id,

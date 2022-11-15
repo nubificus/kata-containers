@@ -32,6 +32,7 @@ import (
 	ops "github.com/kata-containers/kata-containers/src/runtime/virtcontainers/pkg/firecracker/client/operations"
 	"github.com/kata-containers/kata-containers/src/runtime/virtcontainers/types"
 	"github.com/kata-containers/kata-containers/src/runtime/virtcontainers/utils"
+	"github.com/nubificus/vaccel-go-runtime/vaccel"
 
 	"github.com/blang/semver"
 	"github.com/containerd/console"
@@ -145,6 +146,8 @@ type firecracker struct {
 	firecrackerd *exec.Cmd              //Tracks the firecracker process itself
 	fcConfig     *types.FcConfig        // Parameters configured before VM starts
 	connection   *client.FirecrackerAPI //Tracks the current active connection
+
+	accelerator *vaccel.Vaccel
 
 	id               string //Unique ID per pod. Normally maps to the sandbox id
 	vmPath           string //All jailed VM assets need to be under this
@@ -351,6 +354,34 @@ func (fc *firecracker) waitVMMRunning(ctx context.Context, timeout int) error {
 	}
 }
 
+func (fc *firecracker) hasAccel(ctx context.Context) *vaccel.Vaccel {
+       //span, _ := fc.trace(ctx, "hasAccel")
+       //defer span.End()
+
+        accelerators := fc.config.MachineAccelerators
+        if accelerators != "" {
+               for _, accelerator := range strings.Split(accelerators, ",") {
+                       switch strings.TrimSpace(accelerator){
+                       case "vaccel":
+                               vaccel := &vaccel.Vaccel{
+                                       GuestBackend: fc.config.VaccelGuestBackend,
+                                       HostBackends: fc.config.VaccelHostBackends,
+                                       VaccelPath: fc.config.VaccelPath,
+                               }
+                               if vaccel.GuestBackend == "vsock" {
+                                       vaccel.SocketPort = fc.config.VaccelVsockPort
+                               }
+                               return vaccel
+                       default:
+                               fc.Logger().Warnf("Acceleration Framework not supported %s", accelerator)
+                               break
+                       }
+               }
+
+        }
+       return nil
+}
+
 func (fc *firecracker) fcInit(ctx context.Context, timeout int) error {
 	span, _ := katatrace.Trace(ctx, fc.Logger(), "fcInit", fcTracingTags, map[string]string{"sandbox_id": fc.id})
 	defer span.End()
@@ -398,6 +429,14 @@ func (fc *firecracker) fcInit(ctx context.Context, timeout int) error {
 			"--api-sock", fc.socketPath,
 			"--config-file", fc.fcConfigPath)
 		cmd = exec.Command(fc.config.HypervisorPath, args...)
+
+                if fc.accelerator != nil && fc.accelerator.GuestBackend == "virtio" {
+                       // firecracker with virtio vaccel works only with seccomp 0 lvl
+                       cmd.Args = append(cmd.Args, "--seccomp-level", "0")
+                       // append cmd environment with vAccel specific env vars
+                       cmd.Env = os.Environ()
+                       cmd.Env = append(cmd.Env, fc.accelerator.VaccelEnv()...)
+                }
 	}
 
 	if fc.config.Debug {
@@ -770,6 +809,7 @@ func (fc *firecracker) StartVM(ctx context.Context, timeout int) error {
 	span, _ := katatrace.Trace(ctx, fc.Logger(), "StartVM", fcTracingTags, map[string]string{"sandbox_id": fc.id})
 	defer span.End()
 
+	fc.accelerator = fc.hasAccel(ctx)
 	if err := fc.fcInitConfiguration(ctx); err != nil {
 		return err
 	}
@@ -807,6 +847,12 @@ func (fc *firecracker) StartVM(ctx context.Context, timeout int) error {
 		return err
 	}
 
+        if fc.accelerator != nil && fc.accelerator.GuestBackend == "vsock" {
+                fc.accelerator.SocketPath = filepath.Join(fc.jailerRoot, defaultHybridVSocketName)
+                if err := fc.accelerator.VaccelInit(); err != nil {
+                       return err
+                }
+        }
 	// make sure 'others' don't have access to this socket
 	err = os.Chmod(fc.hybridSocketPath, 0640)
 	if err != nil {
@@ -886,6 +932,11 @@ func (fc *firecracker) StopVM(ctx context.Context, waitOnly bool) (err error) {
 	span, _ := katatrace.Trace(ctx, fc.Logger(), "StopVM", fcTracingTags, map[string]string{"sandbox_id": fc.id})
 	defer span.End()
 
+	if fc.accelerator != nil && fc.accelerator.GuestBackend == "vsock" {
+		if err := fc.accelerator.VaccelEnd(); err != nil {
+			return err
+		}
+	}
 	return fc.fcEnd(ctx, waitOnly)
 }
 
