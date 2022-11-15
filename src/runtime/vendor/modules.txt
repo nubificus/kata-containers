@@ -239,6 +239,9 @@ github.com/mdlayher/vsock
 github.com/mitchellh/mapstructure
 # github.com/moby/sys/mountinfo v0.6.2
 github.com/moby/sys/mountinfo
+# github.com/nubificus/vaccel-go-runtime v0.0.0-20210707084234-0ff8f2b93bdc
+## explicit
+github.com/nubificus/vaccel-go-runtime/vaccel
 # github.com/oklog/ulid v1.3.1
 github.com/oklog/ulid
 # github.com/opencontainers/go-digest v1.0.0

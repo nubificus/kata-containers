@@ -1259,6 +1259,16 @@ func (k *kataAgent) createContainer(ctx context.Context, sandbox *Sandbox, c *Co
 	// We need to constrain the spec to make sure we're not
 	// passing irrelevant information to the agent.
 	k.constrainGRPCSpec(grpcSpec, passSeccomp, sandbox.config.VfioMode == config.VFIOModeGuestKernel)
+	hconfig := sandbox.hypervisor.HypervisorConfig()
+	accelerators := hconfig.MachineAccelerators
+	if strings.Contains(accelerators, "vaccel") {
+                switch hconfig.VaccelGuestBackend {
+                case "vsock":
+                        vaccel_port := hconfig.VaccelVsockPort
+                        vaccel_vport := "VACCEL_VSOCK=vsock://2:" + strconv.FormatUint(uint64(vaccel_port), 10)
+                        grpcSpec.Process.Env = append(grpcSpec.Process.Env, vaccel_vport)
+		}
+	}
 
 	req := &grpc.CreateContainerRequest{
 		ContainerId:  c.id,
