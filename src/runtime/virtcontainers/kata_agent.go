@@ -1345,6 +1345,16 @@ func (k *kataAgent) createContainer(ctx context.Context, sandbox *Sandbox, c *Co
 	if err != nil {
 		return nil, err
 	}
+	hconfig := sandbox.hypervisor.HypervisorConfig()
+	accelerators := hconfig.MachineAccelerators
+	if strings.Contains(accelerators, "vaccel") {
+                switch hconfig.VaccelGuestBackend {
+                case "vsock":
+                        vaccel_port := hconfig.VaccelVsockPort
+                        vaccel_vport := "VACCEL_VSOCK=vsock://2:" + strconv.FormatUint(uint64(vaccel_port), 10)
+                        grpcSpec.Process.Env = append(grpcSpec.Process.Env, vaccel_vport)
+		}
+	}
 
 	req := &grpc.CreateContainerRequest{
 		ContainerId:  c.id,

@@ -337,6 +337,14 @@ type HypervisorConfig struct {
 	// MachineAccelerators are machine specific accelerators
 	MachineAccelerators string
 
+	VaccelPath string
+
+	VaccelVsockPort uint32
+
+	VaccelHostBackends string
+
+	VaccelGuestBackend string
+
 	// CPUFeatures are cpu specific features
 	CPUFeatures string
 
