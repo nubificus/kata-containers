@@ -9,33 +9,35 @@ use anyhow::Result;
 use async_trait::async_trait;
 use kata_types::capabilities::Capabilities;
 use std::sync::Arc;
-use tokio::synec::RwLock;
+use tokio::sync::RwLock;
 
-pub struct Firecracker{
-    inner: Arc<RwLock<FcInner>>
+use crate::HypervisorConfig;
+
+pub struct Firecracker<'f> {
+    inner: Arc<RwLock<FcInner<'f>>>,
 }
 
-impl Default for Firecracker{
-    fn default() -> Self{
+impl<'f> Default for Firecracker<'f> {
+    fn default() -> Self {
         Self::new()
     }
 }
 
-impl Firecracker{
-    pub fn new() -> Self{
-        Self{
-            inner: Arc::new(RwLock::new(FcInner::new()))
+impl<'f> Firecracker<'f> {
+    pub fn new() -> Self {
+        Self {
+            inner: Arc::new(RwLock::new(FcInner::new())),
         }
     }
 
-    pub async fn set_hypervisor_config(&mut self, config: HypervisorConfig){
-        let mut inner = self.inner.write().await;
-        inner.set_hypervisor_config(config)
-    }
+    //    pub async fn set_hypervisor_config(&mut self, config: HypervisorConfig){
+    //        let mut inner = self.inner.write().await;
+    //        inner.set_hypervisor_config(config)
+    //    }
 }
 
 #[async_trait]
-impl Hypervisor for Firecracker {
+impl<'f> Hypervisor for Firecracker<'f> {
     async fn prepare_vm(&self, id: &str, netns: Option<String>) -> Result<()> {
         let mut inner = self.inner.write().await;
         inner.prepare_vm(id, netns).await
@@ -48,7 +50,7 @@ impl Hypervisor for Firecracker {
 
     async fn stop_vm(&self) -> Result<()> {
         let mut inner = self.inner.write().await;
-        inner.stop_vm()
+        inner.stop_vm().await
     }
 
     async fn pause_vm(&self) -> Result<()> {
@@ -118,7 +120,7 @@ impl Hypervisor for Firecracker {
 
     async fn save_state(&self) -> Result<HypervisorState> {
         todo!()
-//        self.save().await
+        //        self.save().await
     }
 
     async fn capabilities(&self) -> Result<Capabilities> {
@@ -126,4 +128,3 @@ impl Hypervisor for Firecracker {
         inner.capabilities().await
     }
 }
-

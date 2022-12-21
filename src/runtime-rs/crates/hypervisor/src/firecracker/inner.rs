@@ -1,21 +1,27 @@
-use anyhow::Result;
+use anyhow::{Context, Result};
 
+use crate::Device;
+use crate::HypervisorState;
 use crate::{HypervisorConfig, VcpuThreadIds};
-use kata_types::capabilities::{CapabilityBits,Capabilities};
+use kata_types::capabilities::{Capabilities, CapabilityBits};
 
-use std::{borrow::Cow, path::Path};
+use firec::MachineState;
+use hyper::Client;
+use std::{borrow::Cow, convert::TryInto, path::Path, process::Stdio};
 use uuid::Uuid;
-use firec::Machine};
-use hyperlocal::{UnixConnector};
+
+use hyperlocal::{UnixClientExt, UnixConnector};
+use sysinfo::{Pid, ProcessExt, ProcessRefreshKind, System, SystemExt};
+use tokio::{process::Command, task};
 
 const VSOCK_SCHEME: &str = "vsock";
 const VSOCK_AGENT_CID: u32 = 3;
 const VSOCK_AGENT_PORT: u32 = 1024;
 
-unsafe impl Send for FcInner{}
-unsafe impl Sync for FcInner{}
+unsafe impl<'f> Send for FcInner<'f> {}
+unsafe impl<'f> Sync for FcInner<'f> {}
 
-pub struct FcInner<'f>{
+pub struct FcInner<'f> {
     pub(crate) vm_id: Uuid,
     pub(crate) fc_path: Cow<'f, Path>,
     pub(crate) asock_path: Cow<'f, Path>,
@@ -23,14 +29,11 @@ pub struct FcInner<'f>{
     pub(crate) config: Cow<'f, Path>,
     pub(crate) client: Client<UnixConnector>,
     pub(crate) has_conf: bool,
+}
 
-
-
-use tokio::{process::Command};
-
-impl<'f>  FcInner<'f>{
-    pub fn new()->FcInner{
-        FcInner{
+impl<'f> FcInner<'f> {
+    pub fn new() -> FcInner<'f> {
+        FcInner {
             vm_id: Uuid::new_v4(),
             fc_path: Path::new("/usr/bin/firecracker").into(),
             asock_path: Path::new("/tmp/firecracker.socket").into(),
@@ -41,7 +44,7 @@ impl<'f>  FcInner<'f>{
         }
     }
     pub(crate) async fn prepare_vm(&mut self, _id: &str, _netns: Option<String>) -> Result<()> {
-        ///could maybe remove socket later on
+        //could maybe remove socket later on
         info!(sl!(), "Preparing Firecracker");
         Ok(())
     }
@@ -49,56 +52,44 @@ impl<'f>  FcInner<'f>{
     pub(crate) async fn start_vm(&mut self, _timeout: i32) -> Result<()> {
         info!(sl!(), "Starting Firecracker");
 
-        let mut command = Command::new(&self.fc_path);
-        ///need to change error handling to that of kata
-        command
-            .arg("-kernel")
-            .arg(&self.config.boot_info.kernel)
-            .arg("-m")
-            .arg(format!("{}M", &self.config.memory_info.default_memory))
-            let cmd = match self.has_conf {
-                true => cmd
-                    .args(&[
-                          "--config-file",
-                          ///here
-                          self.config.to_str(),
-                          "--api-sock",
-                          self.as_path.to_str(),
-                    ])
-                    .stdin(Stdio::inherit())
-                    .stdout(Stdio::inherit())
-                    .stderr(Stdio::inherit()),
-                false => cmd
-                    .args(&[
-                          ///here
-                          "--api-sock",
-                          self.as_path.to_str(),
-                    ])
-                    .stdin(Stdio::inherit())
-                    .stdout(Stdio::inherit())
-                    .stderr(Stdio::inherit()),
-            };
-        let mut child = cmd.spawn()?;
-        let pid: u32 = match child.id() {
-            Some(id) => id,
-            None => {
-                ///for sure here
-                let exit_status = child.wait().await?;
-                error!(sl!(), "failed to call end err : {:?}", exit_status);
-            }
+        let mut cmd = Command::new(self.fc_path.to_str().context("Invalid Config Path")?);
+        //need to change error handling to that of kata
+        let cmd = match self.has_conf {
+            true => cmd
+                .args(&[
+                    "--config-file",
+                    //here
+                    self.config.to_str().context("Invalid Config Path")?,
+                    "--api-sock",
+                    self.asock_path.to_str().context("Invalid Socket Path")?,
+                ])
+                .stdin(Stdio::inherit())
+                .stdout(Stdio::inherit())
+                .stderr(Stdio::inherit()),
+            false => cmd
+                .args(&[
+                    //here
+                    "--api-sock",
+                    self.asock_path.to_str().context("Invalid Socket Path")?,
+                ])
+                .stdin(Stdio::inherit())
+                .stdout(Stdio::inherit())
+                .stderr(Stdio::inherit()),
         };
-        trace!("{vm_id}: VM started successfully.");
+        let mut child = cmd.spawn()?;
+        //this may not work as intented
+        let pid = child.id().context("Process exited Immidiately")?;
         self.state = MachineState::RUNNING {
             pid: pid.try_into()?,
         };
         child.wait().await?;
         Ok(())
     }
-    ///alot of error handling here
-    pub(crate) fn stop_vm(&mut self) -> Result<()> {
+    //alot of error handling here
+    pub(crate) async fn stop_vm(&mut self) -> Result<()> {
         let pid = match self.state {
             MachineState::SHUTOFF => {
-                return Err(Error::ProcessNotStarted);
+                anyhow::bail!("Firecracker is not running");
             }
             MachineState::RUNNING { pid } => pid,
         };
@@ -107,16 +98,18 @@ impl<'f>  FcInner<'f>{
             if sys.refresh_process_specifics(Pid::from(pid), ProcessRefreshKind::new()) {
                 match sys.process(Pid::from(pid)) {
                     Some(process) => Ok(process.kill()),
-                    None => Err(Error::ProcessNotRunning(pid)),
+                    None => {
+                        anyhow::bail!("Process with pid {:?} is not running", pid);
+                    }
                 }
             } else {
-                Err(Error::ProcessNotRunning(pid))
+                anyhow::bail!("Process with pid {:?} is not running", pid);
             }
         })
         .await??;
 
         if !killed {
-            return Err(Error::ProcessNotKilled(pid));
+            error!(sl!(), "Process with pid {:?} was not killed", pid);
         }
         self.state = MachineState::SHUTOFF;
         Ok(())
@@ -136,20 +129,16 @@ impl<'f>  FcInner<'f>{
         todo!()
     }
 
-
     /// TODO: using a single hardcoded CID is clearly not adequate in the
     /// long run. Use the recently added VsockConfig infrastructure to
     ///  fix this.
-    pub(crate) async fn get_agent_socket(&self) ->
-        Result<String> {
-            info!(sl!(), "FcInner: Get agent socket");
-            Ok(format!(
-                    "{}://{}:{}",
-                    VSOCK_SCHEME,
-                    VSOCK_AGENT_CID,
-                    VSOCK_AGENT_PORT
-                    ))
-        }
+    pub(crate) async fn get_agent_socket(&self) -> Result<String> {
+        info!(sl!(), "FcInner: Get agent socket");
+        Ok(format!(
+            "{}://{}:{}",
+            VSOCK_SCHEME, VSOCK_AGENT_CID, VSOCK_AGENT_PORT
+        ))
+    }
 
     pub(crate) async fn disconnect(&mut self) {
         info!(sl!(), "FcInner: Disconnect");
@@ -158,7 +147,7 @@ impl<'f>  FcInner<'f>{
 
     pub(crate) fn hypervisor_config(&self) -> HypervisorConfig {
         info!(sl!(), "FcInner: Hypervisor config");
-        self.config.clone()
+        todo!()
     }
 
     pub(crate) async fn get_thread_ids(&self) -> Result<VcpuThreadIds> {
@@ -185,13 +174,19 @@ impl<'f>  FcInner<'f>{
         info!(sl!(), "FcInner: Get jailerroot");
         todo!()
     }
-    pub(crate) async fn save_state(&self) -> Result<HypervisorState>{
+    pub(crate) async fn save_state(&self) -> Result<HypervisorState> {
         info!(sl!(), "FcInner: Save state");
         todo!()
     }
+    //check this later
+    pub(crate) async fn capabilities(&self) -> Result<Capabilities> {
+        let mut caps = Capabilities::default();
+        caps.set(CapabilityBits::FsSharingSupport);
+        Ok(caps)
+    }
 
-    ///Could maybe make inner_device
-    ///have to see what to do with the requests/actions
+    //Could maybe make inner_device
+    //have to see what to do with the requests/actions
     pub(crate) async fn add_device(&mut self, device: Device) -> Result<()> {
         info!(sl!(), "FcInner: Add device {}", device);
         todo!()

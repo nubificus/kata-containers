@@ -38,6 +38,12 @@ futures = "0.3.25"
 safe-path = "0.1.0"
 crossbeam-channel = "0.5.6"
 
+firec={ git = "https://github.com/nubificus/firec", branch="v2" }
+hyperlocal = "0.8.0"
+uuid = {version = "1.0.0", features = ["serde", "v4"]}
+hyper = {version = "0.14.18", features = ["client"]}
+sysinfo = "0.23.12"
+
 [features]
 default = []
 
