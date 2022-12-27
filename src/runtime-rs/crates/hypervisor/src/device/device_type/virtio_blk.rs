@@ -95,9 +95,11 @@ impl Device for VirtioBlkDevice {
     async fn device_id(&self) -> &str {
         self.base.device_id().await
     }
+
     async fn set_device_info(&mut self, device_info: GenericConfig) -> Result<()> {
         self.base.set_device_info(device_info).await
     }
+
     async fn get_device_info(&self) -> Result<GenericConfig> {
         self.base.get_device_info().await
     }

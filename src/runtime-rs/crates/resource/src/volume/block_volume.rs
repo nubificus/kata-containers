@@ -15,11 +15,12 @@ use anyhow::{anyhow, Context};
 use hypervisor::{device_manager::DeviceManager, device_type::GenericConfig};
 use nix::sys::stat::{self, SFlag};
 use tokio::sync::RwLock;
-#[derive(Debug)]
+
 pub(crate) struct BlockVolume {
     storage: Option<agent::Storage>,
     mount: oci::Mount,
     device_id: String,
+    device_manager: Arc<RwLock<DeviceManager>>,
 }
 
 /// BlockVolume: block device volume
@@ -109,6 +110,7 @@ impl BlockVolume {
             storage: Some(storage),
             mount,
             device_id,
+            device_manager: d,
         })
     }
 }
@@ -129,13 +131,11 @@ impl Volume for BlockVolume {
     }
 
     async fn cleanup(&self) -> Result<()> {
-        // TODO: Clean up BlockVolume
-        warn!(sl!(), "Cleaning up BlockVolume is still unimplemented.");
-        Ok(())
-    }
-
-    fn get_device_id(&self) -> Result<Option<String>> {
-        Ok(Some(self.device_id.clone()))
+        self.device_manager
+            .write()
+            .await
+            .try_remove_device(&self.device_id)
+            .await
     }
 }
 
