@@ -22,8 +22,9 @@ use async_trait::async_trait;
 use common::{message::Message, RuntimeHandler, RuntimeInstance};
 use hypervisor::{dragonball::Dragonball, Hypervisor, HYPERVISOR_DRAGONBALL};
 use hypervisor::{qemu::Qemu, HYPERVISOR_QEMU};
+use hypervisor::{firecracker::Firecracker, HYPERVISOR_FIRECRACKER};
 use kata_types::config::{
-    hypervisor::register_hypervisor_plugin, DragonballConfig, QemuConfig, TomlConfig,
+    hypervisor::register_hypervisor_plugin, DragonballConfig, QemuConfig, FirecrackerConfig, TomlConfig,
 };
 
 #[cfg(feature = "cloud-hypervisor")]
@@ -46,6 +47,9 @@ impl RuntimeHandler for VirtContainer {
 
         let qemu_config = Arc::new(QemuConfig::new());
         register_hypervisor_plugin("qemu", qemu_config);
+
+        let firecracker_config = Arc::new(FirecrackerConfig::new());
+        register_hypervisor_plugin("firecracker", firecracker_config);
 
         #[cfg(feature = "cloud-hypervisor")]
         {
@@ -135,7 +139,13 @@ async fn new_hypervisor(toml_config: &TomlConfig) -> Result<Arc<dyn Hypervisor>>
                 .await;
             Ok(Arc::new(hypervisor))
         }
-
+        HYPERVISOR_FIRECRACKER => {
+            let mut hypervisor = Firecracker::new();
+            hypervisor
+                .set_hypervisor_config(hypervisor_config.clone())
+                .await;
+            Ok(Arc::new(hypervisor))
+        }
         #[cfg(feature = "cloud-hypervisor")]
         HYPERVISOR_NAME_CH => {
             let mut hypervisor = CloudHypervisor::new();

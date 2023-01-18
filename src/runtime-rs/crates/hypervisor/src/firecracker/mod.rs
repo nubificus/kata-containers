@@ -30,10 +30,10 @@ impl<'f> Firecracker<'f> {
         }
     }
 
-    //    pub async fn set_hypervisor_config(&mut self, config: HypervisorConfig){
-    //        let mut inner = self.inner.write().await;
-    //        inner.set_hypervisor_config(config)
-    //    }
+    pub async fn set_hypervisor_config(&mut self, config: HypervisorConfig){
+        let mut inner = self.inner.write().await;
+        inner.set_hypervisor_config(config)
+    }
 }
 
 #[async_trait]
@@ -120,7 +120,7 @@ impl<'f> Hypervisor for Firecracker<'f> {
 
     async fn save_state(&self) -> Result<HypervisorState> {
         todo!()
-        //        self.save().await
+        //self.save().await
     }
 
     async fn capabilities(&self) -> Result<Capabilities> {

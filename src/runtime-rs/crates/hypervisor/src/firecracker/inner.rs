@@ -7,7 +7,7 @@ use kata_types::capabilities::{Capabilities, CapabilityBits};
 
 use firec::MachineState;
 use hyper::Client;
-use std::{borrow::Cow, convert::TryInto, path::Path, process::Stdio};
+use std::{borrow::Cow, path::Path};
 use uuid::Uuid;
 
 use hyperlocal::{UnixClientExt, UnixConnector};
@@ -26,7 +26,8 @@ pub struct FcInner<'f> {
     pub(crate) fc_path: Cow<'f, Path>,
     pub(crate) asock_path: Cow<'f, Path>,
     pub(crate) state: MachineState,
-    pub(crate) config: Cow<'f, Path>,
+    pub(crate) config: HypervisorConfig,
+    pub(crate) config_json: Cow<'f, Path>,
     pub(crate) client: Client<UnixConnector>,
     pub(crate) has_conf: bool,
 }
@@ -38,7 +39,8 @@ impl<'f> FcInner<'f> {
             fc_path: Path::new("/usr/bin/firecracker").into(),
             asock_path: Path::new("/tmp/firecracker.socket").into(),
             state: MachineState::SHUTOFF,
-            config: Path::new("").into(),
+            config: Default::default(),
+            config_json: Path::new("").into(),
             client: Client::unix(),
             has_conf: false,
         }
@@ -46,43 +48,53 @@ impl<'f> FcInner<'f> {
     pub(crate) async fn prepare_vm(&mut self, _id: &str, _netns: Option<String>) -> Result<()> {
         //could maybe remove socket later on
         info!(sl!(), "Preparing Firecracker");
+        
         Ok(())
     }
 
     pub(crate) async fn start_vm(&mut self, _timeout: i32) -> Result<()> {
         info!(sl!(), "Starting Firecracker");
 
-        let mut cmd = Command::new(self.fc_path.to_str().context("Invalid Config Path")?);
-        //need to change error handling to that of kata
-        let cmd = match self.has_conf {
-            true => cmd
-                .args(&[
-                    "--config-file",
-                    //here
-                    self.config.to_str().context("Invalid Config Path")?,
-                    "--api-sock",
-                    self.asock_path.to_str().context("Invalid Socket Path")?,
-                ])
-                .stdin(Stdio::inherit())
-                .stdout(Stdio::inherit())
-                .stderr(Stdio::inherit()),
-            false => cmd
-                .args(&[
-                    //here
-                    "--api-sock",
-                    self.asock_path.to_str().context("Invalid Socket Path")?,
-                ])
-                .stdin(Stdio::inherit())
-                .stdout(Stdio::inherit())
-                .stderr(Stdio::inherit()),
-        };
-        let mut child = cmd.spawn()?;
-        //this may not work as intented
-        let pid = child.id().context("Process exited Immidiately")?;
-        self.state = MachineState::RUNNING {
-            pid: pid.try_into()?,
-        };
-        child.wait().await?;
+        let mut cmd = Command::new(self.fc_path.to_str().context("Invalid FC PATH")?);
+        cmd
+            .args(&[
+                  "--config_json-file",
+                  "/home/gpyrros/firecracker/build/cargo_target/x86_64-unknown-linux-musl/debug/confign_v2.json",
+                  "--api-sock",
+                  "/tmp/firecracker.socket",
+            ]);
+        cmd.spawn()?;
+        //        let mut cmd = Command::new(self.fc_path.to_str().context("Invalid Config Path")?);
+        //        //need to change error handling to that of kata
+        //     let cmd = match self.has_conf {
+        //      true => cmd
+        //       .args(&[
+        //        "--config_json-file",
+        //     //here
+        //  self.config_json.to_str().context("Invalid Config Path")?,
+        //                    "--api-sock",
+        //                 self.asock_path.to_str().context("Invalid Socket Path")?,
+        //          ])
+        //       .stdin(Stdio::inherit())
+        //    .stdout(Stdio::inherit())
+        // .stderr(Stdio::inherit()),
+        //            false => cmd
+        //             .args(&[
+        //              //here
+        //           "--api-sock",
+        //        self.asock_path.to_str().context("Invalid Socket Path")?,
+        // ])
+        //                .stdin(Stdio::inherit())
+        //             .stdout(Stdio::inherit())
+        //          .stderr(Stdio::inherit()),
+        //        };
+        //     let mut child = cmd.spawn()?;
+        //  //this may not work as intented
+        //        let pid = child.id().context("Process exited Immidiately")?;
+        //     self.state = MachineState::RUNNING {
+        //      pid: pid.try_into()?,
+        // };
+        //  child.wait().await?;
         Ok(())
     }
     //alot of error handling here
@@ -148,6 +160,10 @@ impl<'f> FcInner<'f> {
     pub(crate) fn hypervisor_config(&self) -> HypervisorConfig {
         info!(sl!(), "FcInner: Hypervisor config");
         todo!()
+    }
+
+    pub(crate) fn set_hypervisor_config(&mut self, config: HypervisorConfig) {
+        self.config=config;
     }
 
     pub(crate) async fn get_thread_ids(&self) -> Result<VcpuThreadIds> {
