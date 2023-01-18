@@ -73,7 +73,7 @@ impl ConfigPlugin for FirecrackerConfig {
         if let Some(firecracker) = conf.hypervisor.get(HYPERVISOR_NAME_FIRECRACKER) {
             validate_path!(firecracker.path, "FIRECRACKER binary path `{}` is invalid: {}")?;
             if !firecracker.path.is_empty() {
-                return Err(eother!("Path for FIRECRACKER should be empty"));
+                return Err(eother!("Path for FIRECRACKER should be empty fc path: {} x", firecracker.path));
             }
             if !firecracker.valid_jailer_paths.is_empty() {
                 return Err(eother!("Valid Firecracker jailer path list should be empty"));
