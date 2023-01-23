@@ -159,7 +159,7 @@ impl<'f> FcInner<'f> {
 
     pub(crate) fn hypervisor_config(&self) -> HypervisorConfig {
         info!(sl!(), "FcInner: Hypervisor config");
-        todo!()
+        self.config.clone()
     }
 
     pub(crate) fn set_hypervisor_config(&mut self, config: HypervisorConfig) {

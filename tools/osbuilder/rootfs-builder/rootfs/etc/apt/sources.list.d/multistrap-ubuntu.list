@@ -1,0 +1,2 @@
+deb [arch=amd64] http://archive.ubuntu.com/ubuntu focal main
+deb-src http://archive.ubuntu.com/ubuntu focal main

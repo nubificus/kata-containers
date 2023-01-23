@@ -1,0 +1,25 @@
+SERVERFILE=/var/lib/dhcp/chrony.servers.$interface
+
+chrony_config() {
+    rm -f "$SERVERFILE"
+    for server in $new_ntp_servers; do
+        echo "$server iburst" >> "$SERVERFILE"
+    done
+    /usr/lib/chrony/chrony-helper update-daemon || :
+}
+
+chrony_restore() {
+    if [ -f "$SERVERFILE" ]; then
+        rm -f "$SERVERFILE"
+        /usr/lib/chrony/chrony-helper update-daemon || :
+    fi
+}
+
+case $reason in
+    BOUND|RENEW|REBIND|REBOOT)
+        chrony_config
+        ;;
+    EXPIRE|FAIL|RELEASE|STOP)
+        chrony_restore
+        ;;
+esac

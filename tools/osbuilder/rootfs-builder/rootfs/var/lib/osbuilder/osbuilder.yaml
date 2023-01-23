@@ -1,0 +1,25 @@
+---
+osbuilder:
+  url: "https://github.com/kata-containers/kata-containers/tools/osbuilder"
+  version: "unknown"
+rootfs-creation-time: "2022-12-12T14:05:47.868697309+0000Z"
+description: "osbuilder rootfs"
+file-format-version: "0.0.2"
+architecture: "x86_64"
+base-distro:
+  name: "ubuntu"
+  version: "focal"
+  packages:
+    default:
+      - "chrony"
+      - "init"
+      - "iptables"
+      - "libseccomp2"
+    extra:
+      - "bash"
+      - "coreutils"
+agent:
+  url: "https://github.com/kata-containers/kata-containers"
+  name: "kata-agent"
+  version: "3.1.0-alpha0"
+  agent-is-init-daemon: "no"

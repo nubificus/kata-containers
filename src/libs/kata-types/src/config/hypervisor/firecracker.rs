@@ -10,6 +10,8 @@ use crate::config::default::MIN_FIRECRACKER_MEMORY_SIZE_MB;
 use crate::config::{ConfigPlugin, TomlConfig};
 use crate::{eother, resolve_path, validate_path};
 
+use crate::config::hypervisor::{VIRTIO_FS, VIRTIO_FS_INLINE};
+
 /// Hypervisor name for firecracker, used to index `TomlConfig::hypervisor`.
 pub const HYPERVISOR_NAME_FIRECRACKER: &str = "firecracker";
 
@@ -72,12 +74,9 @@ impl ConfigPlugin for FirecrackerConfig {
     fn validate(&self, conf: &TomlConfig) -> Result<()> {
         if let Some(firecracker) = conf.hypervisor.get(HYPERVISOR_NAME_FIRECRACKER) {
             validate_path!(firecracker.path, "FIRECRACKER binary path `{}` is invalid: {}")?;
-            if !firecracker.path.is_empty() {
-                return Err(eother!("Path for FIRECRACKER should be empty fc path: {} x", firecracker.path));
-            }
-            if !firecracker.valid_jailer_paths.is_empty() {
-                return Err(eother!("Valid Firecracker jailer path list should be empty"));
-            }
+//            if !firecracker.valid_jailer_paths.is_empty() {
+//                return Err(eother!("Valid Firecracker jailer path list should be empty"));
+//            }
 
 //We may not need this
 //            if !firecracker.blockdev_info.disable_block_device_use
@@ -111,6 +110,12 @@ impl ConfigPlugin for FirecrackerConfig {
 //                  firecracker.device_info.default_bridges
 //                ));
 //            }
+
+            if let Some(v) = firecracker.shared_fs.shared_fs.as_ref() {
+                if v != VIRTIO_FS && v != VIRTIO_FS_INLINE {
+                    return Err(eother!("Firecracker hypervisor doesn't support {}", v));
+                }
+            }
 
             if firecracker.memory_info.default_memory < MIN_FIRECRACKER_MEMORY_SIZE_MB {
                 return Err(eother!(
