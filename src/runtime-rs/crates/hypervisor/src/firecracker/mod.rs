@@ -13,17 +13,17 @@ use tokio::sync::RwLock;
 
 use crate::HypervisorConfig;
 
-pub struct Firecracker<'f> {
-    inner: Arc<RwLock<FcInner<'f>>>,
+pub struct Firecracker {
+    inner: Arc<RwLock<FcInner>>,
 }
 
-impl<'f> Default for Firecracker<'f> {
+impl Default for Firecracker {
     fn default() -> Self {
         Self::new()
     }
 }
 
-impl<'f> Firecracker<'f> {
+impl Firecracker {
     pub fn new() -> Self {
         Self {
             inner: Arc::new(RwLock::new(FcInner::new())),
@@ -37,7 +37,7 @@ impl<'f> Firecracker<'f> {
 }
 
 #[async_trait]
-impl<'f> Hypervisor for Firecracker<'f> {
+impl Hypervisor for Firecracker {
     async fn prepare_vm(&self, id: &str, netns: Option<String>) -> Result<()> {
         let mut inner = self.inner.write().await;
         inner.prepare_vm(id, netns).await

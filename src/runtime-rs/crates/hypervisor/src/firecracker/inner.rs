@@ -1,69 +1,77 @@
-use anyhow::{Context, Result};
+use anyhow::{anyhow, Context, Result};
 
-use crate::Device;
+use std::{path::Path, path::PathBuf};
+
+use crate::{Device, VmmState};
 use crate::HypervisorState;
-use crate::{HypervisorConfig, VcpuThreadIds};
-use kata_types::capabilities::{Capabilities, CapabilityBits};
+use crate::VcpuThreadIds;
+use kata_types::{
+    capabilities::{Capabilities, CapabilityBits},
+    config::hypervisor::Hypervisor as HypervisorConfig
+};
 
-use firec::MachineState;
-use hyper::Client;
-use std::{borrow::Cow, path::Path};
-use uuid::Uuid;
-
-use hyperlocal::{UnixClientExt, UnixConnector};
+use hyperlocal::{UnixClientExt, UnixConnector, Uri};
 use sysinfo::{Pid, ProcessExt, ProcessRefreshKind, System, SystemExt};
-use tokio::{process::Command, task};
+use hyper::{Body, Client, Method, Request, Response};
+
+use tokio::process::Command;
 
 const VSOCK_SCHEME: &str = "vsock";
 const VSOCK_AGENT_CID: u32 = 3;
 const VSOCK_AGENT_PORT: u32 = 1024;
 
-unsafe impl<'f> Send for FcInner<'f> {}
-unsafe impl<'f> Sync for FcInner<'f> {}
+unsafe impl Send for FcInner {}
+unsafe impl Sync for FcInner {}
 
-pub struct FcInner<'f> {
-    pub(crate) vm_id: Uuid,
-    pub(crate) fc_path: Cow<'f, Path>,
-    pub(crate) asock_path: Cow<'f, Path>,
-    pub(crate) state: MachineState,
+pub struct FcInner {
+//    pub(crate) vm_id: String,
+//    pub(crate) fc_path: String,
+    pub(crate) asock_path: String,
+    pub(crate) state: VmmState,
     pub(crate) config: HypervisorConfig,
-    pub(crate) config_json: Cow<'f, Path>,
+//    pub(crate) config_json: ,
     pub(crate) client: Client<UnixConnector>,
-    pub(crate) has_conf: bool,
+//    pub(crate) has_conf: bool,
 }
 
-impl<'f> FcInner<'f> {
-    pub fn new() -> FcInner<'f> {
+impl FcInner {
+    pub fn new() -> FcInner {
         FcInner {
-            vm_id: Uuid::new_v4(),
-            fc_path: Path::new("/usr/bin/firecracker").into(),
-            asock_path: Path::new("/tmp/firecracker.socket").into(),
-            state: MachineState::SHUTOFF,
+//            vm_id: "".to_string(),
+//            fc_path: "".to_string(),
+            //not tmp
+            asock_path: "/tmp/firecracker.socket".to_string(),
+            state: VmmState::NotReady,
             config: Default::default(),
-            config_json: Path::new("").into(),
+//            config_json: Path::new("").into(),
             client: Client::unix(),
-            has_conf: false,
+//            has_conf: false,
         }
     }
     pub(crate) async fn prepare_vm(&mut self, _id: &str, _netns: Option<String>) -> Result<()> {
         //could maybe remove socket later on
         info!(sl!(), "Preparing Firecracker");
-        
+        //info!(sl!(), "FC  config: {:?}", self.config);
+
+        info!(sl!(), "Firecracker 1  PATH: {:?}", self.config.path);
+        let mut cmd = Command::new(&self.config.path);
+        info!(sl!(), "Firecracker PATH: {:?}", self.config.path);
+        cmd
+            .args(&[
+                  "--api-sock",
+                  &self.asock_path,
+            ]);
+        cmd.spawn()?;
+    
         Ok(())
     }
 
     pub(crate) async fn start_vm(&mut self, _timeout: i32) -> Result<()> {
         info!(sl!(), "Starting Firecracker");
 
-        let mut cmd = Command::new(self.fc_path.to_str().context("Invalid FC PATH")?);
-        cmd
-            .args(&[
-                  "--config_json-file",
-                  "/home/gpyrros/firecracker/build/cargo_target/x86_64-unknown-linux-musl/debug/confign_v2.json",
-                  "--api-sock",
-                  "/tmp/firecracker.socket",
-            ]);
-        cmd.spawn()?;
+        if self.state == VmmState::NotReady{
+            self.state = VmmState::VmRunning;
+        }
         //        let mut cmd = Command::new(self.fc_path.to_str().context("Invalid Config Path")?);
         //        //need to change error handling to that of kata
         //     let cmd = match self.has_conf {
@@ -99,32 +107,83 @@ impl<'f> FcInner<'f> {
     }
     //alot of error handling here
     pub(crate) async fn stop_vm(&mut self) -> Result<()> {
-        let pid = match self.state {
-            MachineState::SHUTOFF => {
-                anyhow::bail!("Firecracker is not running");
-            }
-            MachineState::RUNNING { pid } => pid,
-        };
-        let killed = task::spawn_blocking(move || {
-            let mut sys = System::new();
-            if sys.refresh_process_specifics(Pid::from(pid), ProcessRefreshKind::new()) {
-                match sys.process(Pid::from(pid)) {
-                    Some(process) => Ok(process.kill()),
-                    None => {
-                        anyhow::bail!("Process with pid {:?} is not running", pid);
-                    }
-                }
-            } else {
-                anyhow::bail!("Process with pid {:?} is not running", pid);
-            }
-        })
-        .await??;
-
-        if !killed {
-            error!(sl!(), "Process with pid {:?} was not killed", pid);
-        }
-        self.state = MachineState::SHUTOFF;
+//        let pid = match self.state {
+//            MachineState::SHUTOFF => {
+//                anyhow::bail!("Firecracker is not running");
+//            }
+//            MachineState::RUNNING { pid } => pid,
+//        };
+//        let killed = task::spawn_blocking(move || {
+//            let mut sys = System::new();
+//            if sys.refresh_process_specifics(Pid::from(pid), ProcessRefreshKind::new()) {
+//                match sys.process(Pid::from(pid)) {
+//                    Some(process) => Ok(process.kill()),
+//                    None => {
+//                        anyhow::bail!("Process with pid {:?} is not running", pid);
+//                    }
+//                }
+//            } else {
+//                anyhow::bail!("Process with pid {:?} is not running", pid);
+//            }
+//        })
+//        .await??;
+//
+//        if !killed {
+//            error!(sl!(), "Process with pid {:?} was not killed", pid);
+//        }
+//        self.state = MachineState::SHUTOFF;
         Ok(())
+    }
+
+    pub(crate) async fn get(&self, uri: &str) -> Result<Response<Body>> {
+        let url: hyper::Uri = Uri::new(&self.asock_path, uri).into();
+        let req = Request::builder()
+            .method(Method::GET)
+            .uri(url)
+            .body(Body::empty())?;
+        return self.send_request(req).await;
+    }
+    pub(crate) async fn post(
+        &self,
+        uri: &str,
+        content_type: &str,
+        content: &str,
+        ) -> Result<Response<Body>> {
+        let url: hyper::Uri = Uri::new(&self.asock_path, uri).into();
+        let body = Body::from(content.to_string());
+        let req = Request::builder()
+            .method(Method::POST)
+            .uri(url)
+            .header("content-type", content_type)
+            .body(body)?;
+        return self.send_request(req).await;
+    }
+
+    pub(crate) async fn put(&self, uri: &str, data: Vec<u8>) -> Result<Response<Body>> {
+        let url: hyper::Uri = Uri::new(&self.asock_path, uri).into();
+        let req = Request::builder()
+            .method(Method::PUT)
+            .uri(url)
+            .body(Body::from(data))?;
+        return self.send_request(req).await;
+    }
+
+    pub(crate) async fn patch(&self, uri: &str, data: Vec<u8>) -> Result<Response<Body>> {
+        todo!()
+    }
+
+    pub(crate) async fn send_request(&self, req: Request<Body>) -> Result<Response<Body>> {
+        let msg = format!("Request ({:?}) to uri {:?}", req.method(), req.uri());
+        let resp = self.client.request(req).await.context(format!("{:?} failed", msg));
+        resp
+
+    //    match self.timeout {
+    //        Some(timeout) => match tokio::time::timeout(timeout, resp).await {
+    //            Ok(result) => result.map_err(|e| anyhow!(e)),
+    //            Err(_) => Err(anyhow!("{:?} timeout after {:?}", msg, self.timeout)),
+    //        },
+    //        None => resp.await.context(format!("{:?} failed", msg)),
+    //    }
     }
 
     pub(crate) fn pause_vm(&self) -> Result<()> {
