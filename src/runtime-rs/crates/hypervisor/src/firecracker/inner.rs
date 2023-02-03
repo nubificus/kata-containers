@@ -1,6 +1,6 @@
 use anyhow::{anyhow, Context, Result};
 
-use std::{path::Path, path::PathBuf};
+use std::{path::Path, path::PathBuf, io::ErrorKind};
 
 use crate::{Device, VmmState};
 use crate::HypervisorState;
@@ -14,7 +14,7 @@ use hyperlocal::{UnixClientExt, UnixConnector, Uri};
 use sysinfo::{Pid, ProcessExt, ProcessRefreshKind, System, SystemExt};
 use hyper::{Body, Client, Method, Request, Response};
 
-use tokio::process::Command;
+use tokio::{fs, process::Command};
 
 const VSOCK_SCHEME: &str = "vsock";
 const VSOCK_AGENT_CID: u32 = 3;
@@ -49,29 +49,42 @@ impl FcInner {
         }
     }
     pub(crate) async fn prepare_vm(&mut self, _id: &str, _netns: Option<String>) -> Result<()> {
-        //could maybe remove socket later on
         info!(sl!(), "Preparing Firecracker");
+        match fs::remove_file(&self.asock_path).await {
+            Ok(_) => info!(sl!(), "Deleted Firecracker API socket {:?}", self.asock_path),
+            Err(e) if e.kind() == ErrorKind::NotFound => {
+                info!(sl!(), "Firecracker API socket not found {:?}", self.asock_path);
+            }
+            Err(e) => error!(sl!(), "ERROR deletingr API socket {:?}", self.asock_path),
+        }
         //info!(sl!(), "FC  config: {:?}", self.config);
 
-        info!(sl!(), "Firecracker 1  PATH: {:?}", self.config.path);
         let mut cmd = Command::new(&self.config.path);
-        info!(sl!(), "Firecracker PATH: {:?}", self.config.path);
+        info!(sl!(), "Firecracker PATH: {:?}", &self.config.path);
         cmd
             .args(&[
                   "--api-sock",
                   &self.asock_path,
             ]);
         cmd.spawn()?;
-    
+        self.state = VmmState::VmmServerReady;
+
+        let body_kernel: String = format!("
+         {{
+          \"kernel_image_path\": {},
+          \"boot_args\": {}
+         }}", &self.config.boot_info.kernel, &self.config.boot_info.kernel_params);
+        
+        self.put("/boot-source", body_kernel).await?;
+
         Ok(())
     }
 
     pub(crate) async fn start_vm(&mut self, _timeout: i32) -> Result<()> {
         info!(sl!(), "Starting Firecracker");
 
-        if self.state == VmmState::NotReady{
-            self.state = VmmState::VmRunning;
-        }
+        
+        self.state = VmmState::VmRunning;
         //        let mut cmd = Command::new(self.fc_path.to_str().context("Invalid Config Path")?);
         //        //need to change error handling to that of kata
         //     let cmd = match self.has_conf {
@@ -135,48 +148,66 @@ impl FcInner {
         Ok(())
     }
 
-    pub(crate) async fn get(&self, uri: &str) -> Result<Response<Body>> {
-        let url: hyper::Uri = Uri::new(&self.asock_path, uri).into();
-        let req = Request::builder()
-            .method(Method::GET)
-            .uri(url)
-            .body(Body::empty())?;
-        return self.send_request(req).await;
-    }
-    pub(crate) async fn post(
-        &self,
-        uri: &str,
-        content_type: &str,
-        content: &str,
-        ) -> Result<Response<Body>> {
-        let url: hyper::Uri = Uri::new(&self.asock_path, uri).into();
-        let body = Body::from(content.to_string());
-        let req = Request::builder()
-            .method(Method::POST)
-            .uri(url)
-            .header("content-type", content_type)
-            .body(body)?;
-        return self.send_request(req).await;
-    }
+//    pub(crate) async fn get(&self, uri: &str) -> Result<Response<Body>> {
+//        let url: hyper::Uri = Uri::new(&self.asock_path, uri).into();
+//        let req = Request::builder()
+//            .method(Method::GET)
+//            .uri(url)
+//            .body(Body::empty())?;
+//        return self.send_request(req).await;
+//    }
+//    pub(crate) async fn post(
+//        &self,
+//        uri: &str,
+//        content_type: &str,
+//        content: &str,
+//        ) -> Result<Response<Body>> {
+//        let url: hyper::Uri = Uri::new(&self.asock_path, uri).into();
+//        let body = Body::from(content.to_string());
+//        let req = Request::builder()
+//            .method(Method::POST)
+//            .uri(url)
+//            .header("content-type", content_type)
+//            .body(body)?;
+//        return self.send_request(req).await;
+//    }
 
-    pub(crate) async fn put(&self, uri: &str, data: Vec<u8>) -> Result<Response<Body>> {
+    pub(crate) async fn put(&self, uri: &str, data: String) -> Result<()> {
+        info!(sl!(), "PUT Request to uri{:?}", uri);
         let url: hyper::Uri = Uri::new(&self.asock_path, uri).into();
         let req = Request::builder()
             .method(Method::PUT)
             .uri(url)
+            .header("Accept", "application/json")
+            .header("Content-Type", "application/json")
             .body(Body::from(data))?;
         return self.send_request(req).await;
     }
 
-    pub(crate) async fn patch(&self, uri: &str, data: Vec<u8>) -> Result<Response<Body>> {
+    pub(crate) async fn patch(&self, uri: &str, data: String) -> Result<Response<Body>> {
         todo!()
     }
 
-    pub(crate) async fn send_request(&self, req: Request<Body>) -> Result<Response<Body>> {
-        let msg = format!("Request ({:?}) to uri {:?}", req.method(), req.uri());
-        let resp = self.client.request(req).await.context(format!("{:?} failed", msg));
-        resp
+    pub(crate) async fn send_request(&self, req: Request<Body>) -> Result<()> {
+        info!(sl!(), "SEND ({:?}) Request ", req.method());
+        let resp = self.client.request(req).await?;
 
+        let status = resp.status();
+        if status.is_success() {
+            info!(sl!(), "Request SUCCESSFUL");
+        } else {
+            let body = hyper::body::to_bytes(resp.into_body()).await?;
+            let body = if body.is_empty() {
+                info!(sl!(), "Request FAILED WITH STATUS: {:?}", status);
+                None
+            } else {
+                let body = String::from_utf8_lossy(&body).into_owned();
+                info!(sl!(), "Request FAILED WITH STATUS: {:?} and BODY: {:?}", status, body);
+                Some(body)
+            };
+        }
+
+        Ok(())
     //    match self.timeout {
     //        Some(timeout) => match tokio::time::timeout(timeout, resp).await {
     //            Ok(result) => result.map_err(|e| anyhow!(e)),
