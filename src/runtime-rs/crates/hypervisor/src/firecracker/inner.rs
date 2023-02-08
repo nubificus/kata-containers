@@ -67,14 +67,15 @@ impl FcInner {
                   &self.asock_path,
             ]);
         cmd.spawn()?;
-        self.state = VmmState::VmmServerReady;
+        self.state = VmmState::VmRunning;
 
         let body_kernel: String = format!("
          {{
-          \"kernel_image_path\": {},
-          \"boot_args\": {}
+          \"kernel_image_path\": \"{}\",
+          \"boot_args\": \"{}\"
          }}", &self.config.boot_info.kernel, &self.config.boot_info.kernel_params);
         
+        info!(sl!(), "BODY KERNEL: {:?}", &body_kernel);
         self.put("/boot-source", body_kernel).await?;
 
         Ok(())
@@ -175,12 +176,17 @@ impl FcInner {
     pub(crate) async fn put(&self, uri: &str, data: String) -> Result<()> {
         info!(sl!(), "PUT Request to uri{:?}", uri);
         let url: hyper::Uri = Uri::new(&self.asock_path, uri).into();
+        info!(sl!(), "PUT Request SOCK: {:?}", &self.asock_path);
+        info!(sl!(), "PUT Request URL: {:?}", &url);
+        info!(sl!(), "PUT Request URI: {:?}", &uri);
+        info!(sl!(), "PUT Request BODY: {:?}", &data);
         let req = Request::builder()
             .method(Method::PUT)
-            .uri(url)
+            .uri(url.clone())
             .header("Accept", "application/json")
             .header("Content-Type", "application/json")
             .body(Body::from(data))?;
+        info!(sl!(), "PUT Request WHOLE{:?}", &req);
         return self.send_request(req).await;
     }
 
@@ -193,6 +199,7 @@ impl FcInner {
         let resp = self.client.request(req).await?;
 
         let status = resp.status();
+        info!(sl!(), "Request RESPONSE {:?}", &status);
         if status.is_success() {
             info!(sl!(), "Request SUCCESSFUL");
         } else {
