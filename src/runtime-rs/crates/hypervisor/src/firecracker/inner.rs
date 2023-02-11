@@ -2,19 +2,20 @@ use anyhow::{anyhow, Context, Result};
 
 use std::{path::Path, path::PathBuf, io::ErrorKind};
 
-use crate::{Device, VmmState};
+use crate::{device::Device, VmmState};
 use crate::HypervisorState;
 use crate::VcpuThreadIds;
 use kata_types::{
     capabilities::{Capabilities, CapabilityBits},
     config::hypervisor::Hypervisor as HypervisorConfig
 };
+use shim_interface::KATA_PATH;
 
 use hyperlocal::{UnixClientExt, UnixConnector, Uri};
 use sysinfo::{Pid, ProcessExt, ProcessRefreshKind, System, SystemExt};
 use hyper::{Body, Client, Method, Request, Response};
 
-use tokio::{fs, process::Command};
+use tokio::{fs,process::Command};
 
 const VSOCK_SCHEME: &str = "vsock";
 const VSOCK_AGENT_CID: u32 = 3;
@@ -32,6 +33,7 @@ pub struct FcInner {
 //    pub(crate) config_json: ,
     pub(crate) client: Client<UnixConnector>,
 //    pub(crate) has_conf: bool,
+    pub(crate) pending_devices: Vec<Device>,
 }
 
 impl FcInner {
@@ -40,16 +42,26 @@ impl FcInner {
 //            vm_id: "".to_string(),
 //            fc_path: "".to_string(),
             //not tmp
-            asock_path: "/tmp/firecracker.socket".to_string(),
+            asock_path: "".to_string(),
             state: VmmState::NotReady,
             config: Default::default(),
 //            config_json: Path::new("").into(),
             client: Client::unix(),
 //            has_conf: false,
+            pending_devices: vec![],
         }
     }
-    pub(crate) async fn prepare_vm(&mut self, _id: &str, _netns: Option<String>) -> Result<()> {
+    pub(crate) async fn prepare_vm(&mut self, id: &str, _netns: Option<String>) -> Result<()> {
         info!(sl!(), "Preparing Firecracker");
+
+        let sb_path= [KATA_PATH, id].join("/");
+
+        info!(sl!(), "SANDBOX PATH: {:?}", sb_path);
+
+        fs::create_dir_all(&sb_path).await.context(format!("failed to create directory {:?}",&sb_path));
+
+        self.asock_path=[&sb_path, "fc.sock"].join("/");
+
         match fs::remove_file(&self.asock_path).await {
             Ok(_) => info!(sl!(), "Deleted Firecracker API socket {:?}", self.asock_path),
             Err(e) if e.kind() == ErrorKind::NotFound => {
@@ -58,7 +70,7 @@ impl FcInner {
             Err(e) => error!(sl!(), "ERROR deletingr API socket {:?}", self.asock_path),
         }
         //info!(sl!(), "FC  config: {:?}", self.config);
-
+        
         let mut cmd = Command::new(&self.config.path);
         info!(sl!(), "Firecracker PATH: {:?}", &self.config.path);
         cmd
@@ -174,8 +186,8 @@ impl FcInner {
 //    }
 
     pub(crate) async fn put(&self, uri: &str, data: String) -> Result<()> {
-        info!(sl!(), "PUT Request to uri{:?}", uri);
         let url: hyper::Uri = Uri::new(&self.asock_path, uri).into();
+        info!(sl!(), "PUT Request to uri{:?}", uri);
         info!(sl!(), "PUT Request SOCK: {:?}", &self.asock_path);
         info!(sl!(), "PUT Request URL: {:?}", &url);
         info!(sl!(), "PUT Request URI: {:?}", &uri);
@@ -190,8 +202,21 @@ impl FcInner {
         return self.send_request(req).await;
     }
 
-    pub(crate) async fn patch(&self, uri: &str, data: String) -> Result<Response<Body>> {
-        todo!()
+    pub(crate) async fn patch(&self, uri: &str, data: String) -> Result<()> {
+        let url: hyper::Uri = Uri::new(&self.asock_path, uri).into();
+        info!(sl!(), "PATCH Request to uri{:?}", uri);
+        info!(sl!(), "PATCH Request SOCK: {:?}", &self.asock_path);
+        info!(sl!(), "PATCH Request URL: {:?}", &url);
+        info!(sl!(), "PATCH Request URI: {:?}", &uri);
+        info!(sl!(), "PATCH Request BODY: {:?}", &data);
+        let req = Request::builder()
+            .method(Method::PATCH)
+            .uri(url.clone())
+            .header("Accept", "application/json")
+            .header("Content-Type", "application/json")
+            .body(Body::from(data))?;
+        info!(sl!(), "PATCH Request WHOLE{:?}", &req);
+        return self.send_request(req).await;
     }
 
     pub(crate) async fn send_request(&self, req: Request<Body>) -> Result<()> {

@@ -1,4 +1,5 @@
 mod inner;
+mod inner_device;
 
 use super::HypervisorState;
 use inner::FcInner;
