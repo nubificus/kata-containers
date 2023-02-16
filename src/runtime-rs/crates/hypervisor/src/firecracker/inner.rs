@@ -15,7 +15,7 @@ use hyperlocal::{UnixClientExt, UnixConnector, Uri};
 use sysinfo::{Pid, ProcessExt, ProcessRefreshKind, System, SystemExt};
 use hyper::{Body, Client, Method, Request, Response};
 
-use tokio::{fs,process::Command};
+use tokio::{fs,process::Command,time::{sleep, Duration}};
 
 const VSOCK_SCHEME: &str = "vsock";
 const VSOCK_AGENT_CID: u32 = 3;
@@ -39,9 +39,6 @@ pub struct FcInner {
 impl FcInner {
     pub fn new() -> FcInner {
         FcInner {
-//            vm_id: "".to_string(),
-//            fc_path: "".to_string(),
-            //not tmp
             asock_path: "".to_string(),
             state: VmmState::NotReady,
             config: Default::default(),
@@ -64,7 +61,7 @@ impl FcInner {
 
         match fs::remove_file(&self.asock_path).await {
             Ok(_) => info!(sl!(), "Deleted Firecracker API socket {:?}", self.asock_path),
-            Err(e) if e.kind() == ErrorKind::NotFound => {
+            Err(e) if e.kind() == ErrorKind::NotFound =>{
                 info!(sl!(), "Firecracker API socket not found {:?}", self.asock_path);
             }
             Err(e) => error!(sl!(), "ERROR deletingr API socket {:?}", self.asock_path),
@@ -78,18 +75,37 @@ impl FcInner {
                   "--api-sock",
                   &self.asock_path,
             ]);
-        cmd.spawn()?;
-        self.state = VmmState::VmRunning;
+        let mut child=cmd.spawn()?;
+        match child.id() {
+            Some(id) => {
+                info!(sl!(), "Firecracker started successfully with id: {:?}", id);
+            }
+            None => {
+                let exit_status = child.wait().await?;
+                error!(sl!(), "ERROR FC process exited Immediatelly {:?}", exit_status);
+            }
+        };
+        self.state = VmmState::VmmServerReady;
 
-        let body_kernel: String = format!("
+        let body_kernel: String =
+            format!("
          {{
           \"kernel_image_path\": \"{}\",
           \"boot_args\": \"{}\"
          }}", &self.config.boot_info.kernel, &self.config.boot_info.kernel_params);
-        
-        info!(sl!(), "BODY KERNEL: {:?}", &body_kernel);
-        self.put("/boot-source", body_kernel).await?;
 
+        let body_rootfs: String = 
+            format!("{{
+              \"drive_id\": \"rootfs\",
+              \"path_on_host\": \"{}\",
+              \"is_root_device\": true,
+              \"is_read_only\": false
+        }}", &self.config.boot_info.image);
+        info!(sl!(), "BODY KERNEL: {:?}", &body_kernel);
+        while !Path::new(&self.asock_path).exists(){}
+        self.put("/boot-source", body_kernel).await?;
+        self.put("/drives/rootfs", body_rootfs).await?;
+        self.instance_start().await?;
         Ok(())
     }
 
@@ -98,37 +114,6 @@ impl FcInner {
 
         
         self.state = VmmState::VmRunning;
-        //        let mut cmd = Command::new(self.fc_path.to_str().context("Invalid Config Path")?);
-        //        //need to change error handling to that of kata
-        //     let cmd = match self.has_conf {
-        //      true => cmd
-        //       .args(&[
-        //        "--config_json-file",
-        //     //here
-        //  self.config_json.to_str().context("Invalid Config Path")?,
-        //                    "--api-sock",
-        //                 self.asock_path.to_str().context("Invalid Socket Path")?,
-        //          ])
-        //       .stdin(Stdio::inherit())
-        //    .stdout(Stdio::inherit())
-        // .stderr(Stdio::inherit()),
-        //            false => cmd
-        //             .args(&[
-        //              //here
-        //           "--api-sock",
-        //        self.asock_path.to_str().context("Invalid Socket Path")?,
-        // ])
-        //                .stdin(Stdio::inherit())
-        //             .stdout(Stdio::inherit())
-        //          .stderr(Stdio::inherit()),
-        //        };
-        //     let mut child = cmd.spawn()?;
-        //  //this may not work as intented
-        //        let pid = child.id().context("Process exited Immidiately")?;
-        //     self.state = MachineState::RUNNING {
-        //      pid: pid.try_into()?,
-        // };
-        //  child.wait().await?;
         Ok(())
     }
     //alot of error handling here
@@ -161,44 +146,20 @@ impl FcInner {
         Ok(())
     }
 
-//    pub(crate) async fn get(&self, uri: &str) -> Result<Response<Body>> {
-//        let url: hyper::Uri = Uri::new(&self.asock_path, uri).into();
-//        let req = Request::builder()
-//            .method(Method::GET)
-//            .uri(url)
-//            .body(Body::empty())?;
-//        return self.send_request(req).await;
-//    }
-//    pub(crate) async fn post(
-//        &self,
-//        uri: &str,
-//        content_type: &str,
-//        content: &str,
-//        ) -> Result<Response<Body>> {
-//        let url: hyper::Uri = Uri::new(&self.asock_path, uri).into();
-//        let body = Body::from(content.to_string());
-//        let req = Request::builder()
-//            .method(Method::POST)
-//            .uri(url)
-//            .header("content-type", content_type)
-//            .body(body)?;
-//        return self.send_request(req).await;
-//    }
-
     pub(crate) async fn put(&self, uri: &str, data: String) -> Result<()> {
         let url: hyper::Uri = Uri::new(&self.asock_path, uri).into();
-        info!(sl!(), "PUT Request to uri{:?}", uri);
-        info!(sl!(), "PUT Request SOCK: {:?}", &self.asock_path);
-        info!(sl!(), "PUT Request URL: {:?}", &url);
-        info!(sl!(), "PUT Request URI: {:?}", &uri);
-        info!(sl!(), "PUT Request BODY: {:?}", &data);
+//        info!(sl!(), "PUT Request to uri{:?}", uri);
+//        info!(sl!(), "PUT Request SOCK: {:?}", &self.asock_path);
+//        info!(sl!(), "PUT Request URL: {:?}", &url);
+//        info!(sl!(), "PUT Request URI: {:?}", &uri);
+//        info!(sl!(), "PUT Request BODY: {:?}", &data);
         let req = Request::builder()
             .method(Method::PUT)
             .uri(url.clone())
             .header("Accept", "application/json")
             .header("Content-Type", "application/json")
             .body(Body::from(data))?;
-        info!(sl!(), "PUT Request WHOLE{:?}", &req);
+//        info!(sl!(), "PUT Request WHOLE{:?}", &req);
         return self.send_request(req).await;
     }
 
@@ -216,6 +177,20 @@ impl FcInner {
             .header("Content-Type", "application/json")
             .body(Body::from(data))?;
         info!(sl!(), "PATCH Request WHOLE{:?}", &req);
+        return self.send_request(req).await;
+    }
+
+    pub(crate) async fn instance_start(&self)->Result<()>{
+        let url: hyper::Uri = Uri::new(&self.asock_path, "/actions").into();
+        let req = Request::builder()
+            .method(Method::PUT)
+            .uri(url.clone())
+            .header("Accept", "application/json")
+            .header("Content-Type", "application/json")
+            .body(Body::from("{
+                    \"action_type\": \"InstanceStart\"
+                   }"))?;
+        info!(sl!(), "INSTANCE START Request WHOLE: {:?}", &req);
         return self.send_request(req).await;
     }
 
