@@ -21,10 +21,11 @@ use anyhow::{anyhow, Context, Result};
 use async_trait::async_trait;
 use common::{message::Message, RuntimeHandler, RuntimeInstance};
 use hypervisor::{dragonball::Dragonball, Hypervisor, HYPERVISOR_DRAGONBALL};
-use hypervisor::{qemu::Qemu, HYPERVISOR_QEMU};
 use hypervisor::{firecracker::Firecracker, HYPERVISOR_FIRECRACKER};
+use hypervisor::{qemu::Qemu, HYPERVISOR_QEMU};
 use kata_types::config::{
-    hypervisor::register_hypervisor_plugin, DragonballConfig, QemuConfig, FirecrackerConfig, TomlConfig,
+    hypervisor::register_hypervisor_plugin, DragonballConfig, FirecrackerConfig, QemuConfig,
+    TomlConfig,
 };
 
 #[cfg(feature = "cloud-hypervisor")]
