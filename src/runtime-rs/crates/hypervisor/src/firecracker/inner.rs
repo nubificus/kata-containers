@@ -68,7 +68,12 @@ impl FcInner {
 
     pub(crate) async fn start_vm(&mut self, _timeout: i32) -> Result<()> {
         info!(sl!(), "Starting Firecracker");
-
+//        self.patch("/drives/drive1");
+//        let body_container_rootfs: String = json!({
+//              "drive_id": "drive1",
+//              "path_on_host": "container_rootfs",
+//        })
+//        .to_string();
         self.state = VmmState::VmRunning;
         Ok(())
     }
