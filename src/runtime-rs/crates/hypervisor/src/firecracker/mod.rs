@@ -123,7 +123,6 @@ impl Hypervisor for Firecracker {
         todo!()
         //self.save().await
     }
-
     async fn capabilities(&self) -> Result<Capabilities> {
         let inner = self.inner.read().await;
         inner.capabilities().await

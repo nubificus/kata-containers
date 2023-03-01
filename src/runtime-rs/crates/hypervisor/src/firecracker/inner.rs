@@ -3,6 +3,7 @@ use anyhow::{anyhow, Context, Result};
 use std::{io::ErrorKind, path::Path, path::PathBuf};
 
 use crate::HypervisorState;
+use crate::VsockConfig;
 use crate::VcpuThreadIds;
 use crate::{device::Device, VmmState};
 use kata_types::{
@@ -10,6 +11,7 @@ use kata_types::{
     config::hypervisor::Hypervisor as HypervisorConfig,
 };
 use shim_interface::KATA_PATH;
+use crate::HybridVsockConfig;
 
 use hyper::{Body, Client, Method, Request, Response};
 use hyperlocal::{UnixClientExt, UnixConnector, Uri};
@@ -23,15 +25,15 @@ use tokio::{
 
 use serde_json::json;
 
-const VSOCK_SCHEME: &str = "vsock";
-const VSOCK_AGENT_CID: u32 = 3;
-const VSOCK_AGENT_PORT: u32 = 1024;
+const FC_API_SOCKET_NAME: &str = "fc.sock";
+const FC_AGENT_SOCKET_NAME: &str = "fc-agent.sock";
+
 
 unsafe impl Send for FcInner {}
 unsafe impl Sync for FcInner {}
 
 pub struct FcInner {
-    //pub(crate) vm_id: String,
+    pub(crate) id: String,
     //pub(crate) fc_path: String,
     pub(crate) asock_path: String,
     pub(crate) state: VmmState,
@@ -40,27 +42,36 @@ pub struct FcInner {
     pub(crate) client: Client<UnixConnector>,
     //pub(crate) has_conf: bool,
     pub(crate) pending_devices: Vec<Device>,
+    pub(crate) capabilities: Capabilities,
 }
 
 impl FcInner {
     pub fn new() -> FcInner {
+        let mut capabilities = Capabilities::new();
+        capabilities.set(
+            CapabilityBits::BlockDeviceSupport
+            );
         FcInner {
-            asock_path: "".to_string(),
+            id: String::default(),
+            asock_path: String::default(),
             state: VmmState::NotReady,
             config: Default::default(),
             //config_json: Path::new("").into(),
             client: Client::unix(),
             //has_conf: false,
             pending_devices: vec![],
+            capabilities
         }
     }
     pub(crate) async fn prepare_vm(&mut self, id: &str, _netns: Option<String>) -> Result<()> {
         info!(sl!(), "Preparing Firecracker");
 
+        self.id=id.to_string();
         self.prepare_api_socket(id).await?;
         self.prepare_vmm().await?;
         self.state = VmmState::VmmServerReady;
         self.prepare_vmm_resources().await?;
+        self.prepare_hvsock().await?;
         self.instance_start().await?;
 
         Ok(())
@@ -82,14 +93,15 @@ impl FcInner {
         Ok(())
     }
 
+
     pub(crate) async fn prepare_api_socket(&mut self, id: &str) -> Result<()> {
-        let sb_path = [KATA_PATH, id].join("/");
+        let sb_path = get_sandbox_path(id)?;
 
         fs::create_dir_all(&sb_path)
             .await
             .context(format!("failed to create directory {:?}", &sb_path));
 
-        self.asock_path = [&sb_path, "fc.sock"].join("/");
+        self.asock_path = get_api_socket_path(id)?;
 
         match fs::remove_file(&self.asock_path).await {
             Ok(_) => info!(
@@ -127,6 +139,28 @@ impl FcInner {
         Ok(())
     }
 
+    pub(crate) async fn prepare_hvsock(&mut self) -> Result<()>{
+        info!(sl!(), "PREPARING VSOCK");
+        let uds_path=[KATA_PATH, &self.id, FC_AGENT_SOCKET_NAME].join("/");
+        info!(sl!(), "UDS: {}",&uds_path);
+        let body_vsock: String = json!({
+            "guest_cid": 3,
+            "uds_path": uds_path
+        })
+        .to_string();
+
+        self.put("/vsock",body_vsock).await?;
+      //  let hvs= crate::device::Device::HybridVsock(crate::device::HybridVsockConfig {
+      //      id: format!("vsock-{}", &self.id),
+      //      guest_cid: 3,
+      //      uds_path,
+      //  });
+      //  self.add_device(hvs).await.context("add device")?;
+
+        Ok(())
+    }
+
+
     pub(crate) async fn prepare_vmm_resources(&mut self) -> Result<()> {
         let body_kernel: String = json!({
             "kernel_image_path": &self.config.boot_info.kernel,
@@ -142,6 +176,8 @@ impl FcInner {
         })
         .to_string();
         //FIXME busywait
+        // similar to
+        // https://github.com/kata-containers/kata-containers/blob/109071855df8d73af9bb089c2a4a1d9006c08bb3/src/runtime-rs/crates/hypervisor/src/ch/inner_hypervisor.rs#L163
         while !Path::new(&self.asock_path).exists() {}
         self.put("/boot-source", body_kernel).await?;
         self.put("/drives/rootfs", body_rootfs).await?;
@@ -237,14 +273,13 @@ impl FcInner {
         todo!()
     }
 
-    /// TODO: using a single hardcoded CID is clearly not adequate in the
-    /// long run. Use the recently added VsockConfig infrastructure to
-    ///  fix this.
     pub(crate) async fn get_agent_socket(&self) -> Result<String> {
+        const HYBRID_VSOCK_SCHEME: &str = "hvsock";
         info!(sl!(), "FcInner: Get agent socket");
+        let vsock_path=get_vsock_path(&self.id)?;
         Ok(format!(
-            "{}://{}:{}",
-            VSOCK_SCHEME, VSOCK_AGENT_CID, VSOCK_AGENT_PORT
+            "{}://{}",
+            HYBRID_VSOCK_SCHEME, vsock_path
         ))
     }
 
@@ -292,20 +327,21 @@ impl FcInner {
     }
     //check this later
     pub(crate) async fn capabilities(&self) -> Result<Capabilities> {
-        let mut caps = Capabilities::default();
-        caps.set(CapabilityBits::FsSharingSupport);
-        Ok(caps)
+        Ok(self.capabilities.clone())
     }
 
-    //Could maybe make inner_device
-    //have to see what to do with the requests/actions
-    pub(crate) async fn add_device(&mut self, device: Device) -> Result<()> {
-        info!(sl!(), "FcInner: Add device {}", device);
-        todo!()
-    }
-
-    pub(crate) async fn remove_device(&mut self, device: Device) -> Result<()> {
-        info!(sl!(), "FcInner: Remove Device {} ", device);
-        todo!()
-    }
 }
+    //Could be move to a new file at a later time
+    pub(crate) fn get_sandbox_path(id: &str) -> Result<String> {
+        Ok([KATA_PATH, id].join("/"))
+    }
+
+    pub(crate) fn get_api_socket_path(id: &str) -> Result<String> {
+        let sb_path = get_sandbox_path(id)?;
+        Ok([&sb_path, FC_API_SOCKET_NAME].join("/"))
+    }
+
+    pub(crate) fn get_vsock_path(id: &str) -> Result<String> {
+        let sb_path = get_sandbox_path(id)?;
+        Ok([&sb_path, FC_AGENT_SOCKET_NAME].join("/"))
+    }
