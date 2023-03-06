@@ -6,6 +6,7 @@
 
 mod nydus_rootfs;
 mod share_fs_rootfs;
+mod devmapper_rootfs;
 
 use agent::Storage;
 use anyhow::{anyhow, Context, Result};
@@ -18,6 +19,8 @@ use tokio::sync::RwLock;
 use crate::share_fs::ShareFs;
 
 use self::nydus_rootfs::NYDUS_ROOTFS_TYPE;
+
+use hypervisor::HYPERVISOR_FIRECRACKER;
 
 const ROOTFS: &str = "rootfs";
 const HYBRID_ROOTFS_LOWER_DIR: &str = "rootfs_lower";
@@ -62,7 +65,7 @@ impl RootFsResource {
         root: &oci::Root,
         bundle_path: &str,
         rootfs_mounts: &[Mount],
-    ) -> Result<Arc<dyn Rootfs>> {
+        ) -> Result<Arc<dyn Rootfs>> {
         match rootfs_mounts {
             // if rootfs_mounts is empty
             mounts_vec if mounts_vec.is_empty() => {
@@ -104,11 +107,18 @@ impl RootFsResource {
                             )
                             .await
                             .context("new share fs rootfs")?,
-                        )
+                            )
                     }
-                } else {
+                }else {
+                    //due to fc having no share_fs and hypervisor trair having type erasure it is
+                    //really hard to construct an else if statement so we just use else for now
                     info!(sl!(),"HIIIII");
-                    return Err(anyhow!("unsupported rootfs {:?}", &layer));
+                    Arc::new(
+                        devmapper_rootfs::DevmapperRootfs::new(&layer)
+                        .await
+                        .context("new devmapper rootfs")?,
+                        )
+                    //return Err(anyhow!("unsupported rootfs {:?}", &layer));
                 };
 
                 let mut inner = self.inner.write().await;

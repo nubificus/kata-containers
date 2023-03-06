@@ -311,7 +311,7 @@ impl FcInner {
 
     pub(crate) async fn get_thread_ids(&self) -> Result<VcpuThreadIds> {
         info!(sl!(), "FcInner: Getthread ids");
-        todo!()
+        Ok(VcpuThreadIds::default())
     }
 
     pub(crate) async fn get_pids(&self) -> Result<Vec<u32>> {
