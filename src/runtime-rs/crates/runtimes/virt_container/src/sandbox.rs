@@ -251,7 +251,6 @@ impl Sandbox for VirtSandbox {
             .setup_after_start_vm()
             .await
             .context("setup device after start vm")?;
-
         // create sandbox in vm
         let agent_config = self.agent.agent_config().await;
         let kernel_modules = KernelModule::set_kernel_modules(agent_config.kernel_modules)?;
@@ -417,6 +416,7 @@ impl Persist for VirtSandbox {
 
     /// Save a state of Sandbox
     async fn save(&self) -> Result<Self::State> {
+        info!(sl!(), "sb: BEFORE SAVE");
         let sandbox_state = crate::sandbox_persist::SandboxState {
             sandbox_type: VIRTCONTAINER.to_string(),
             resource: Some(self.resource_manager.save().await?),

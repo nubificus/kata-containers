@@ -72,6 +72,8 @@ impl VsockConfig {
                 unsafe { vhost_vsock_set_guest_cid(vhost_fd.as_raw_fd(), &(rand_cid as u64)) };
             match guest_cid {
                 Ok(_) => {
+                    info!(sl!(), "VSOCK CID OK");
+                    info!(sl!(), "VSOCK ID: {}, GUEST CID: {}",&id, &rand_cid);
                     return Ok(VsockConfig {
                         id,
                         guest_cid: rand_cid,
@@ -79,9 +81,11 @@ impl VsockConfig {
                     });
                 }
                 Err(nix::Error::EADDRINUSE) => {
+                    info!(sl!(), "VSOCK CID IN USE");
                     // The CID is already in use. Try another one.
                 }
                 Err(err) => {
+                    info!(sl!(), "VSOCK CID ERROR");
                     return Err(err).context("failed to set guest CID");
                 }
             }

@@ -4,6 +4,9 @@ mod inner_device;
 use super::HypervisorState;
 use inner::FcInner;
 
+use persist::sandbox_persist::Persist;
+use anyhow::Context;
+
 use crate::{device::Device, Hypervisor, VcpuThreadIds};
 
 use anyhow::Result;
@@ -120,11 +123,33 @@ impl Hypervisor for Firecracker {
     }
 
     async fn save_state(&self) -> Result<HypervisorState> {
-        todo!()
-        //self.save().await
+        self.save().await
     }
     async fn capabilities(&self) -> Result<Capabilities> {
         let inner = self.inner.read().await;
         inner.capabilities().await
+    }
+}
+#[async_trait]
+impl Persist for Firecracker {
+    type State = HypervisorState;
+    type ConstructorArgs = ();
+    /// Save a state of the component.
+    async fn save(&self) -> Result<Self::State> {
+        let inner = self.inner.read().await;
+        inner.save().await.context("save hypervisor state")
+    }
+    /// Restore a component from a specified state.
+    async fn restore(
+        hypervisor_args: Self::ConstructorArgs,
+        hypervisor_state: Self::State,
+        ) -> Result<Self> {
+        let inner =
+            FcInner::restore(hypervisor_args,
+                                     hypervisor_state).await?;
+        Ok(Self {
+            inner:
+                Arc::new(RwLock::new(inner)),
+        })
     }
 }

@@ -107,6 +107,7 @@ impl RootFsResource {
                         )
                     }
                 } else {
+                    info!(sl!(),"HIIIII");
                     return Err(anyhow!("unsupported rootfs {:?}", &layer));
                 };
 
