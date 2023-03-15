@@ -5,6 +5,7 @@
 //
 
 use std::sync::Arc;
+use vagent::{construct_unix, WAgent};
 
 use agent::kata::KataAgent;
 use agent::types::KernelModule;
@@ -22,6 +23,7 @@ use hypervisor::{utils::get_hvsock_path, HybridVsockConfig, DEFAULT_GUEST_VSOCK_
 use kata_sys_util::hooks::HookStates;
 use kata_types::capabilities::CapabilityBits;
 use kata_types::config::TomlConfig;
+use kata_types::config::hypervisor::VaccelArgs;
 use persist::{self, sandbox_persist::Persist};
 use resource::manager::ManagerArgs;
 use resource::network::{dan_config_path, DanNetworkConfig, NetworkConfig, NetworkWithNetNsConfig};
@@ -32,6 +34,8 @@ use tracing::instrument;
 use crate::health_check::HealthCheck;
 
 pub(crate) const VIRTCONTAINER: &str = "virt_container";
+
+pub const KATA_PATH: &str = "/run/kata";
 
 pub struct SandboxRestoreArgs {
     pub sid: String,
@@ -67,6 +71,7 @@ pub struct VirtSandbox {
     agent: Arc<dyn Agent>,
     hypervisor: Arc<dyn Hypervisor>,
     monitor: Arc<HealthCheck>,
+    vagent: Arc<Mutex<WAgent>>,
 }
 
 impl std::fmt::Debug for VirtSandbox {
@@ -96,6 +101,7 @@ impl VirtSandbox {
             hypervisor,
             resource_manager,
             monitor: Arc::new(HealthCheck::new(true, keep_abnormal)),
+            vagent: Arc::new(Mutex::new(WAgent::new())),
         })
     }
 
@@ -292,6 +298,39 @@ impl VirtSandbox {
     ) -> bool {
         !prestart_hooks.is_empty() || !create_runtime_hooks.is_empty()
     }
+
+   async fn patch_exec_vagent(&self, endpoint: String, args: VaccelArgs) -> Result<()>{
+       info!(sl!(), "BACKENDS: {}", args.backends);
+       info!(sl!(), "AGENT PATH: {}", args.agent_path);
+       let mut vinner = self.vagent.lock().await;
+       vinner
+           .patch(
+               args.agent_path,
+               endpoint,
+               args.debug,
+               args.backends,
+               args.backends_library,
+               )
+           .await
+           .context("failed to patch vagent")?;
+       Ok(())
+   }
+
+   async fn start_vagent(&self, exe_type: &str, _endpoint: String) -> Result<()>{
+       let mut vinner = self.vagent.lock().await;
+       match exe_type == "exec" {
+           true => {
+               info!(sl!(), "EXEC VAGENT ");
+               vinner.start().await.context("start vagent")?;
+           }
+           false => {
+               info!(sl!(), "INTEGRATED VAGENT ");
+               #[cfg(feature = "vlib")]
+               let _ = vagent::start_integrated(_endpoint).await?;
+           }
+       };
+       Ok(())
+   }
 }
 
 #[async_trait]
@@ -318,6 +357,15 @@ impl Sandbox for VirtSandbox {
             .prepare_vm(id, network_env.netns.clone())
             .await
             .context("prepare vm")?;
+
+        let hypervisor_config = self.hypervisor.hypervisor_config().await;
+        let args = hypervisor_config.vaccel_args;
+        let exe_type = args.execution_type.clone();
+        let endpoint_source = [KATA_PATH, id, "root", "kata.hvsock"].join("/");
+        info!(sl!(), "ENDPOINT SOURCE: {}", endpoint_source);
+
+        let endpoint = construct_unix(endpoint_source,args.endpoint_port.to_string()).await?; 
+        self.patch_exec_vagent(endpoint.clone(),args).await?;
 
         // generate device and setup before start vm
         // should after hypervisor.prepare_vm
@@ -453,12 +501,15 @@ impl Sandbox for VirtSandbox {
         });
         self.monitor.start(id, self.agent.clone());
         self.save().await.context("save state")?;
+        self.start_vagent(exe_type.as_str(), endpoint).await?;
         Ok(())
     }
 
     async fn stop(&self) -> Result<()> {
         info!(sl!(), "begin stop sandbox");
         self.hypervisor.stop_vm().await.context("stop vm")?;
+        let mut vinner = self.vagent.lock().await;
+        vinner.stop().await.context("stop vagent")?;
         Ok(())
     }
 
@@ -598,6 +649,7 @@ impl Persist for VirtSandbox {
             config,
         };
         let resource_manager = Arc::new(ResourceManager::restore(args, r).await?);
+        let vagent = WAgent::new();
         Ok(Self {
             sid: sid.to_string(),
             msg_sender: Arc::new(Mutex::new(sandbox_args.sender)),
@@ -606,6 +658,7 @@ impl Persist for VirtSandbox {
             hypervisor,
             resource_manager,
             monitor: Arc::new(HealthCheck::new(true, keep_abnormal)),
+            vagent: Arc::new(Mutex::new(vagent)),
         })
     }
 }
