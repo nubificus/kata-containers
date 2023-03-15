@@ -3,6 +3,9 @@
 //
 // SPDX-License-Identifier: Apache-2.0
 //
+//
+use vagent::{construct_unix,start_integrated};
+//use std::path::Path;
 
 use std::sync::Arc;
 
@@ -19,7 +22,7 @@ use common::{
 use containerd_shim_protos::events::task::TaskOOM;
 use hypervisor::{dragonball::Dragonball, Hypervisor, HYPERVISOR_DRAGONBALL};
 use kata_sys_util::hooks::HookStates;
-use kata_types::config::TomlConfig;
+use kata_types::config::{TomlConfig,hypervisor::VaccelArgs};
 use resource::{
     manager::ManagerArgs,
     network::{NetworkConfig, NetworkWithNetNsConfig},
@@ -31,6 +34,9 @@ use crate::health_check::HealthCheck;
 use persist::{self, sandbox_persist::Persist};
 
 pub(crate) const VIRTCONTAINER: &str = "virt_container";
+
+pub const KATA_PATH: &str = "/run/kata";
+
 pub struct SandboxRestoreArgs {
     pub sid: String,
     pub toml_config: TomlConfig,
@@ -74,7 +80,7 @@ impl VirtSandbox {
         agent: Arc<dyn Agent>,
         hypervisor: Arc<dyn Hypervisor>,
         resource_manager: Arc<ResourceManager>,
-    ) -> Result<Self> {
+        ) -> Result<Self> {
         Ok(Self {
             sid: sid.to_string(),
             msg_sender: Arc::new(Mutex::new(msg_sender)),
@@ -83,8 +89,8 @@ impl VirtSandbox {
             hypervisor,
             resource_manager,
             monitor: Arc::new(HealthCheck::new(true, false)),
-        })
-    }
+                })
+            }
 
     async fn prepare_for_start_sandbox(
         &self,
@@ -174,7 +180,10 @@ impl Sandbox for VirtSandbox {
             .prepare_vm(id, netns.clone())
             .await
             .context("prepare vm")?;
-
+      
+        let hypervisor_config = self.hypervisor.hypervisor_config().await;
+        
+        
         // generate device and setup before start vm
         // should after hypervisor.prepare_vm
         let resources = self.prepare_for_start_sandbox(id, netns).await?;
@@ -186,7 +195,7 @@ impl Sandbox for VirtSandbox {
         // start vm
         self.hypervisor.start_vm(10_000).await.context("start vm")?;
         info!(sl!(), "start vm");
-
+        
         // execute pre-start hook functions, including Prestart Hooks and CreateRuntime Hooks
         let (prestart_hooks, create_runtime_hooks) = match spec.hooks.as_ref() {
             Some(hooks) => (hooks.prestart.clone(), hooks.create_runtime.clone()),
@@ -275,6 +284,7 @@ impl Sandbox for VirtSandbox {
         });
         self.monitor.start(id, self.agent.clone());
         self.save().await.context("save state")?;
+        let _=start_vagent(id,hypervisor_config.vaccel_args).await;
         Ok(())
     }
 
@@ -368,6 +378,37 @@ impl Sandbox for VirtSandbox {
             .context("sandbox: failed to get iptables")?;
         Ok(resp.data)
     }
+}
+
+async fn start_vagent(id: &str, args: VaccelArgs)->Result<()>{
+        let endpoint_source = [KATA_PATH, id, "root", "kata.hvsock"].join("/");
+        info!(sl!(), "ENDPOINT SOURCE: {}",endpoint_source);
+        let endpoint = construct_unix(endpoint_source,args.endpoint_port.to_string()).await?; 
+        info!(sl!(), "ENDPOINT: {}",endpoint);
+        
+        let _ = match args.execution_type.as_str(){
+            "exec" =>{
+                let mut agent = vagent::Agent::create(
+                    args.agent_path,
+                    endpoint,
+                    args.debug,
+                    args.backends,
+                    args.backends_library,
+                    )
+                    .await;
+                info!(sl!(), "EXEC VAGENT ");
+                agent.start().await?;
+            },
+            "integrated" => {
+                info!(sl!(), "INTEGRATED VAGENT ");
+                let _ = start_integrated(endpoint).await?;
+            },
+            _ => {
+                warn!(sl!(), "WRONG EXE TYPE ");
+            },
+        };
+
+        Ok(())
 }
 
 #[async_trait]
