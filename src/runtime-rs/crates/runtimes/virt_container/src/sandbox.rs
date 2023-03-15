@@ -4,6 +4,7 @@
 // SPDX-License-Identifier: Apache-2.0
 //
 
+use vagent::{construct_unix, WAgent};
 use std::sync::Arc;
 
 use agent::{
@@ -31,6 +32,9 @@ use crate::health_check::HealthCheck;
 use persist::{self, sandbox_persist::Persist};
 
 pub(crate) const VIRTCONTAINER: &str = "virt_container";
+
+pub const KATA_PATH: &str = "/run/kata";
+
 pub struct SandboxRestoreArgs {
     pub sid: String,
     pub toml_config: TomlConfig,
@@ -65,6 +69,7 @@ pub struct VirtSandbox {
     agent: Arc<dyn Agent>,
     hypervisor: Arc<dyn Hypervisor>,
     monitor: Arc<HealthCheck>,
+    vagent: Arc<Mutex<WAgent>>,
 }
 
 impl VirtSandbox {
@@ -85,6 +90,7 @@ impl VirtSandbox {
             hypervisor,
             resource_manager,
             monitor: Arc::new(HealthCheck::new(true, keep_abnormal)),
+            vagent: Arc::new(Mutex::new(WAgent::new())),
         })
     }
 
@@ -194,6 +200,21 @@ impl Sandbox for VirtSandbox {
             .prepare_vm(id, network_env.netns.clone())
             .await
             .context("prepare vm")?;
+      
+        let hypervisor_config = self.hypervisor.hypervisor_config().await;
+        let endpoint_source = [KATA_PATH, id, "root", "kata.hvsock"].join("/");
+        info!(sl!(), "ENDPOINT SOURCE: {}",endpoint_source);
+        let endpoint = construct_unix(endpoint_source,hypervisor_config.vaccel_args.endpoint_port.to_string()).await?; 
+        
+        let mut vinner = self.vagent.lock().await;
+        vinner
+            .patch(hypervisor_config.vaccel_args.agent_path.to_string(),
+                endpoint,
+                hypervisor_config.vaccel_args.debug.to_string(),
+                hypervisor_config.vaccel_args.backends.to_string(),
+                hypervisor_config.vaccel_args.backends_library.to_string())
+            .await
+            .context("failed to patch vagent")?;
 
         // generate device and setup before start vm
         // should after hypervisor.prepare_vm
@@ -208,7 +229,9 @@ impl Sandbox for VirtSandbox {
         // start vm
         self.hypervisor.start_vm(10_000).await.context("start vm")?;
         info!(sl!(), "start vm");
-
+        
+        vinner.start().await.context("start vagent")?;
+        
         // execute pre-start hook functions, including Prestart Hooks and CreateRuntime Hooks
         let (prestart_hooks, create_runtime_hooks) = match spec.hooks.as_ref() {
             Some(hooks) => (hooks.prestart.clone(), hooks.create_runtime.clone()),
@@ -323,6 +346,8 @@ impl Sandbox for VirtSandbox {
     async fn stop(&self) -> Result<()> {
         info!(sl!(), "begin stop sandbox");
         self.hypervisor.stop_vm().await.context("stop vm")?;
+        let mut vinner = self.vagent.lock().await;
+        vinner.stop().await.context("stop vagent")?;
         Ok(())
     }
 
@@ -450,6 +475,7 @@ impl Persist for VirtSandbox {
             config,
         };
         let resource_manager = Arc::new(ResourceManager::restore(args, r).await?);
+        let vagent = WAgent::new();
         Ok(Self {
             sid: sid.to_string(),
             msg_sender: Arc::new(Mutex::new(sandbox_args.sender)),
@@ -458,6 +484,7 @@ impl Persist for VirtSandbox {
             hypervisor,
             resource_manager,
             monitor: Arc::new(HealthCheck::new(true, keep_abnormal)),
+            vagent: Arc::new(Mutex::new(vagent)),
         })
     }
 }

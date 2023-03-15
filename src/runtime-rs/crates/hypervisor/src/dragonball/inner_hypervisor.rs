@@ -18,6 +18,7 @@ use crate::{
 };
 use shim_interface::KATA_PATH;
 const DEFAULT_HYBRID_VSOCK_NAME: &str = "kata.hvsock";
+//const DEFAULT_VAGENT_VSOCK_NAME: &str = "vaccel.hvsock";
 
 fn get_vsock_path(root: &str) -> String {
     [root, DEFAULT_HYBRID_VSOCK_NAME].join("/")
@@ -35,13 +36,13 @@ impl DragonballInner {
         // prepare vsock
         let uds_path = [&self.jailer_root, DEFAULT_HYBRID_VSOCK_NAME].join("/");
         let d = DeviceType::HybridVsock(HybridVsockDevice {
+//            id: format!("root"),
             id: format!("vsock-{}", &self.id),
             config: HybridVsockConfig {
                 guest_cid: 3,
                 uds_path,
             },
         });
-
         self.add_device(d).await.context("add device")?;
         Ok(())
     }
