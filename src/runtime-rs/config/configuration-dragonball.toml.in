@@ -17,6 +17,13 @@ ctlpath = "@DBCTLPATH@"
 kernel = "@KERNELPATH_DB@"
 image = "@IMAGEPATH@"
 
+agent_path= "@AGENTPATH@"
+debug= "@AGENTDEBUG@"
+backends= @BACKENDS@
+backends_library= "@BACKENDSLIB@"
+endpoint_port= "@ENDPOINTPORT@"
+execution_type= @AGENTEXECTYPE@
+
 # rootfs filesystem type:
 #   - ext4 (default)
 #   - xfs

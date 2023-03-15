@@ -36,7 +36,10 @@ oci = { path = "../../../../libs/oci" }
 persist = { path = "../../persist"}
 resource = { path = "../../resource" }
 
+vagent = { git = "https://git@github.com/nubificus/vaccel-rs-lib.git", branch="main" }
+
 [features]
+vlib = ["vagent/vlib"]
 default = []
 
 # Feature is not yet complete, so not enabled by default.

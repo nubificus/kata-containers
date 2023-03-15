@@ -72,6 +72,29 @@ pub fn get_hypervisor_plugin(name: &str) -> Option<Arc<dyn ConfigPlugin>> {
     hypervisors.get(name).cloned()
 }
 
+/// VACCEL PARAMS
+#[derive(Clone, Debug, Default, Deserialize, Serialize)]
+pub struct VaccelArgs {
+    /// Path to the vaccel agent
+    #[serde(default)]
+    pub agent_path: String,
+    /// Level of debug from agent with range  [1-4]
+    #[serde(default)]
+    pub debug: String,
+    /// Plugins to include
+    #[serde(default)]
+    pub backends: String,
+    /// Plugins directory
+    #[serde(default)]
+    pub backends_library: String,
+    /// Agent's endpoint port
+    #[serde(default)]
+    pub endpoint_port: String,
+    /// execution type of vagent exec or integrated
+    #[serde(default)]
+    pub execution_type: String,
+}
+
 /// Configuration information for block device.
 #[derive(Clone, Debug, Default, Deserialize, Serialize)]
 pub struct BlockDeviceInfo {
@@ -1013,6 +1036,10 @@ pub struct Hypervisor {
     /// Vendor customized runtime configuration.
     #[serde(default, flatten)]
     pub vendor: HypervisorVendor,
+
+    /// vaccel args
+    #[serde(default, flatten)]
+    pub vaccel_args: VaccelArgs,
 }
 
 impl Hypervisor {
