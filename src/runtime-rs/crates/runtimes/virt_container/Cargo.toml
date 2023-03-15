@@ -36,8 +36,11 @@ oci = { path = "../../../../libs/oci" }
 persist = { path = "../../persist"}
 resource = { path = "../../resource" }
 
+vagent = { git = "https://git@github.com/nubificus/vaccel-rs-lib.git", branch="main" }
+
 [features]
 default = ["cloud-hypervisor"]
+vlib = ["vagent/vlib"]
 
 # Enable the Cloud Hypervisor driver
 cloud-hypervisor = []
