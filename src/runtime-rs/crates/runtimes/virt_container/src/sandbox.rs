@@ -4,6 +4,8 @@
 // SPDX-License-Identifier: Apache-2.0
 //
 
+use vagent::{construct_unix, Agent as VAgent};
+
 use std::sync::Arc;
 
 use agent::{
@@ -65,6 +67,7 @@ pub struct VirtSandbox {
     agent: Arc<dyn Agent>,
     hypervisor: Arc<dyn Hypervisor>,
     monitor: Arc<HealthCheck>,
+    vagent: VAgent,
 }
 
 impl VirtSandbox {
@@ -74,7 +77,8 @@ impl VirtSandbox {
         agent: Arc<dyn Agent>,
         hypervisor: Arc<dyn Hypervisor>,
         resource_manager: Arc<ResourceManager>,
-    ) -> Result<Self> {
+        vagent: VAgent,
+        ) -> Result<Self> {
         Ok(Self {
             sid: sid.to_string(),
             msg_sender: Arc::new(Mutex::new(msg_sender)),
@@ -83,8 +87,9 @@ impl VirtSandbox {
             hypervisor,
             resource_manager,
             monitor: Arc::new(HealthCheck::new(true, false)),
-        })
-    }
+            vagent,
+                })
+            }
 
     async fn prepare_for_start_sandbox(
         &self,
@@ -407,6 +412,7 @@ impl Persist for VirtSandbox {
             config,
         };
         let resource_manager = Arc::new(ResourceManager::restore(args, r).await?);
+        let vagent: VAgent::create();
         Ok(Self {
             sid: sid.to_string(),
             msg_sender: Arc::new(Mutex::new(sandbox_args.sender)),
@@ -415,6 +421,7 @@ impl Persist for VirtSandbox {
             hypervisor,
             resource_manager,
             monitor: Arc::new(HealthCheck::new(true, false)),
+            vagent,
         })
     }
 }
