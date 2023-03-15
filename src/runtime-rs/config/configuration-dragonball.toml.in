@@ -17,6 +17,13 @@ ctlpath = "@DBCTLPATH@"
 kernel = "@KERNELPATH_DB@"
 image = "@IMAGEPATH@"
 
+agent_path= "/usr/local/bin/vaccelrt-agent"
+debug= "1"
+backends= "noop"
+backends_library= "/usr/local/lib/"
+endpoint_port= "2048"
+execution_type= "integrated"
+
 # rootfs filesystem type:
 #   - ext4 (default)
 #   - xfs
