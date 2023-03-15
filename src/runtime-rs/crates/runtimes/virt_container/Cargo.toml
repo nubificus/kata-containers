@@ -35,6 +35,9 @@ oci = { path = "../../../../libs/oci" }
 persist = { path = "../../persist"}
 resource = { path = "../../resource" }
 
+vaccelrt-agent = {git = "ssh://git@github.com/nubificus/vaccelrt-agent", branch="main" }
+vagent = { git = "ssh://git@github.com/nubificus/vaccel-rs-lib", branch="main" }
+
 [features]
 default = []
 

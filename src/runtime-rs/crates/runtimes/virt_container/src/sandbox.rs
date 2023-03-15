@@ -3,6 +3,9 @@
 //
 // SPDX-License-Identifier: Apache-2.0
 //
+//
+use vagent::construct_unix;
+//use std::path::Path;
 
 use std::sync::Arc;
 
@@ -31,6 +34,9 @@ use crate::health_check::HealthCheck;
 use persist::{self, sandbox_persist::Persist};
 
 pub(crate) const VIRTCONTAINER: &str = "virt_container";
+
+pub const KATA_PATH: &str = "/run/kata";
+
 pub struct SandboxRestoreArgs {
     pub sid: String,
     pub toml_config: TomlConfig,
@@ -199,7 +205,10 @@ impl Sandbox for VirtSandbox {
             .prepare_vm(id, network_env.netns.clone())
             .await
             .context("prepare vm")?;
-
+      
+        let hypervisor_config = self.hypervisor.hypervisor_config().await;
+        
+        
         // generate device and setup before start vm
         // should after hypervisor.prepare_vm
         let resources = self
@@ -337,6 +346,7 @@ impl Sandbox for VirtSandbox {
         });
         self.monitor.start(id, self.agent.clone());
         self.save().await.context("save state")?;
+        let _=start_vagent(id,hypervisor_config.vaccel_args.endpoint_port).await;
         Ok(())
     }
 
@@ -430,6 +440,26 @@ impl Sandbox for VirtSandbox {
             .context("sandbox: failed to get iptables")?;
         Ok(resp.data)
     }
+}
+
+async fn start_vagent(id: &str, port: String)->Result<()>{
+        let endpoint_source = [KATA_PATH, id, "root", "kata.hvsock"].join("/");
+        info!(sl!(), "ENDPOINT SOURCE: {}",endpoint_source);
+        let endpoint = construct_unix(endpoint_source,port.to_string()).await?; 
+        info!(sl!(), "ENDPOINT: {}",endpoint);
+        
+        //while !Path::new(&endpoint).exists() {}
+        let _ = match vlib::new(&endpoint){
+            Ok(mut server) => {
+                info!(sl!(), "INTEGRATED VAGENT STARTED");
+                server.start().context("failed to start vagent")
+            },
+            Err(e) =>{
+                warn!(sl!(), "vagent was not created because of error: {}",e);
+                Ok(())
+            }
+        };
+        Ok(())
 }
 
 #[async_trait]

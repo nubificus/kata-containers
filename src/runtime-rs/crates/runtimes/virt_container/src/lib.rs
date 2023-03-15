@@ -35,7 +35,7 @@ use kata_types::config::{hypervisor::HYPERVISOR_NAME_CH, CloudHypervisorConfig};
 
 use resource::ResourceManager;
 use sandbox::VIRTCONTAINER;
-use tokio::sync::mpsc::Sender;
+use tokio::sync::{mpsc::Sender};
 
 pub struct VirtContainer {}
 
