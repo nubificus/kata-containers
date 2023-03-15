@@ -39,8 +39,12 @@ runtime-spec = { workspace = true }
 persist = { workspace = true }
 resource = { workspace = true }
 
+vagent = { git = "https://git@github.com/nubificus/vaccel-rs-lib.git", branch="main" }
+
 [features]
 default = ["cloud-hypervisor"]
+vlib = ["vagent/vlib"]
+default = []
 
 # Enable the Cloud Hypervisor driver
 cloud-hypervisor = []
