@@ -5,6 +5,7 @@
 //
 
 use std::sync::Arc;
+use vagent::{construct_unix, start_integrated};
 
 use agent::{
     self, kata::KataAgent, types::KernelModule, Agent, GetIPTablesRequest, SetIPTablesRequest,
@@ -21,7 +22,7 @@ use hypervisor::{
     dragonball::Dragonball, Hypervisor, HYPERVISOR_DRAGONBALL, HYPERVISOR_FIRECRACKER,
 };
 use kata_sys_util::hooks::HookStates;
-use kata_types::config::TomlConfig;
+use kata_types::config::{hypervisor::VaccelArgs, TomlConfig};
 use resource::{
     manager::ManagerArgs,
     network::{NetworkConfig, NetworkWithNetNsConfig},
@@ -33,6 +34,9 @@ use crate::health_check::HealthCheck;
 use persist::{self, sandbox_persist::Persist};
 
 pub(crate) const VIRTCONTAINER: &str = "virt_container";
+
+pub const KATA_PATH: &str = "/run/kata";
+
 pub struct SandboxRestoreArgs {
     pub sid: String,
     pub toml_config: TomlConfig,
@@ -197,6 +201,8 @@ impl Sandbox for VirtSandbox {
             .await
             .context("prepare vm")?;
 
+        let hypervisor_config = self.hypervisor.hypervisor_config().await;
+
         // generate device and setup before start vm
         // should after hypervisor.prepare_vm
         let resources = self
@@ -319,6 +325,7 @@ impl Sandbox for VirtSandbox {
         });
         self.monitor.start(id, self.agent.clone());
         self.save().await.context("save state")?;
+        let _ = start_vagent(id, hypervisor_config.vaccel_args).await;
         Ok(())
     }
 
@@ -412,6 +419,36 @@ impl Sandbox for VirtSandbox {
             .context("sandbox: failed to get iptables")?;
         Ok(resp.data)
     }
+}
+
+async fn start_vagent(id: &str, args: VaccelArgs) -> Result<()> {
+    let endpoint_source = [KATA_PATH, id, "root", "kata.hvsock"].join("/");
+    info!(sl!(), "ENDPOINT SOURCE: {}", endpoint_source);
+    let endpoint = construct_unix(endpoint_source, args.endpoint_port.to_string()).await?;
+    info!(sl!(), "ENDPOINT: {}", endpoint);
+
+    let _ = match args.execution_type.as_str() {
+        "exec" => {
+            let mut agent = vagent::Agent::create(
+                args.agent_path,
+                endpoint,
+                args.debug,
+                args.backends,
+                args.backends_library,
+            )
+            .await;
+            info!(sl!(), "EXEC VAGENT ");
+            agent.start().await?;
+        }
+        "integrated" => {
+            info!(sl!(), "INTEGRATED VAGENT ");
+            let _ = start_integrated(endpoint).await?;
+        }
+        _ => {
+            warn!(sl!(), "WRONG EXE TYPE ");
+        }
+    };
+    Ok(())
 }
 
 #[async_trait]
