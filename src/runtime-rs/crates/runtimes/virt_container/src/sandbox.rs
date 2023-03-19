@@ -37,11 +37,6 @@ use persist::{self, sandbox_persist::Persist};
 pub(crate) const VIRTCONTAINER: &str = "virt_container";
 
 pub const KATA_PATH: &str = "/run/kata";
-pub(crate) const ENDPOINT_PORT: &str = "2048";
-pub(crate) const DEBUG: &str = "1";
-pub(crate) const AGENT_PATH: &str = "/usr/local/bin/vaccelrt-agent";
-pub(crate) const BACKENDS: &str = "noop";
-pub(crate) const BACKENDS_LIBRARY: &str = "/usr/local/lib/";
 
 pub struct SandboxRestoreArgs {
     pub sid: String,
@@ -189,13 +184,19 @@ impl Sandbox for VirtSandbox {
             .await
             .context("prepare vm")?;
       
-        let endpoint_source = [KATA_PATH, id, "root"].join("/");
+        let hypervisor_config = self.hypervisor.hypervisor_config().await;
+        let endpoint_source = [KATA_PATH, id, "root", "kata.hvsock"].join("/");
         info!(sl!(), "ENDPOINT SOURCE: {}",endpoint_source);
-        let endpoint = construct_unix(endpoint_source,ENDPOINT_PORT.to_string()).await?; 
+        let endpoint = construct_unix(endpoint_source,hypervisor_config.vaccel_args.endpoint_port.to_string()).await?; 
+        
 
         let mut vinner = self.vagent.lock().await;
         vinner
-            .patch(AGENT_PATH.to_string(),endpoint,DEBUG.to_string(),BACKENDS.to_string(),BACKENDS_LIBRARY.to_string())
+            .patch(hypervisor_config.vaccel_args.agent_path.to_string(),
+                endpoint,
+                hypervisor_config.vaccel_args.debug.to_string(),
+                hypervisor_config.vaccel_args.backends.to_string(),
+                hypervisor_config.vaccel_args.backends_library.to_string())
             .await
             .context("failed to patch vagent")?;
 

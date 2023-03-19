@@ -144,7 +144,7 @@ impl DragonballInner {
 
     fn add_hvsock(&mut self, config: &HybridVsockConfig) -> Result<()> {
         let vsock_cfg = VsockDeviceConfigInfo {
-            id: String::from("root"),
+            id: config.id.clone(),
             guest_cid: config.guest_cid,
             uds_path: Some(config.uds_path.clone()),
             ..Default::default()
