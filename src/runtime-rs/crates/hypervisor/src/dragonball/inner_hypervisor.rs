@@ -40,7 +40,6 @@ impl DragonballInner {
             guest_cid: 3,
             uds_path,
         });
-        info!(sl!(), "VROOM");
       //  let d2 = crate::device::Device::HybridVsock(crate::device::HybridVsockConfig {
       //      id: format!("vsock-vaccel-{}", &self.id),
       //      guest_cid: 3,
