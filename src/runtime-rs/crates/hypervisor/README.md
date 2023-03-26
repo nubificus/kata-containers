@@ -114,3 +114,61 @@ pub trait Hypervisor: Send + Sync {
 In current design, VM will be started in the following steps.
 
 ![vmm start](../../docs/images/vm-start.svg)
+
+## 3. Hypervisor Devices
+The device Manager is responsible for handling the hypervisor's devices. 
+
+Within the `struct`, there are three major components:
+* devices is a hash map that stores all of the devices that have already been attached to the VM
+* hypervisor offers functionalities for attaching devices
+* shared_info is used to hold the hypervisor's global variables, such as the current block index and the index that has already been released
+
+The device manager will provide the following public methods to other `crate`:
+* `try_add_device` will try to attach the device into the hypervisor
+* `try_remove_device` will try to remove the device from the hypervisor
+* `get_driver_option`, `get_device_guest_path` , and `get_device_vm_path` could provide some detail information about the device in the guest, and those information will be provided to the agent for further operation in the guest
+
+![device manager](../../docs/images/device_manager.drawio.svg)
+
+For different kind of devices operation, the specific device will implement this trait. Currently, virtio-block device has been implemented, and we plan to enable `Vfio` device and vhost-user device in the future.
+```rust
+#[async_trait]
+pub trait Device: Send + Sync {
+    // attach is to plug block device into VM
+    async fn attach(&mut self, h: &dyn hypervisor, da: DeviceArgument) -> Result<()>;
+    // detach is to unplug block device from VM
+    async fn detach(&mut self, h: &dyn hypervisor) -> Result<Option<u64>>;
+    // device_id returns device ID
+    async fn device_id(&self) -> &str;
+    // set_device_info set the device info
+    async fn set_device_info(&mut self, device_info: GenericConfig) -> Result<()>;
+    // get_device_info returns device config
+    async fn get_device_info(&self) -> Result<GenericConfig>;
+    // get_major_minor returns device major and minor numbers
+    async fn get_major_minor(&self) -> (i64, i64);
+    // get_host_path return the device path in the host
+    async fn get_host_path(&self) -> &str;
+    // get the bus device function id of device
+    async fn get_bdf(&self) -> Option<String>;
+    // get the virt path of the device
+    async fn get_virt_path(&self) -> Option<String>;
+    // get_attach_count returns how many times the device has been attached
+    async fn get_attach_count(&self) -> u64;
+    // increase_attach_count is used to increase the attach count for a device
+    // return values:
+    // * skip bool: no need to do real attach when current attach count is zero, skip following actions.
+    // * err error: error while do increase attach count
+    async fn increase_attach_count(&mut self) -> Result<bool>;
+    // decrease_attach_count is used to decrease the attach count for a device
+    // return values:
+    // * skip bool: no need to do real dettach when current attach count is not zero, skip following actions.
+    // * err error: error while do decrease attach count
+    async fn decrease_attach_count(&mut self) -> Result<bool>;
+    // get the device driver type
+    async fn device_driver(&self) -> Option<String>;
+    // get the device guest path
+    async fn get_device_guest_path(&self) -> Option<String>;
+    // get the device vm path
+    async fn get_device_vm_path(&self) -> Option<String>;
+}
+```
