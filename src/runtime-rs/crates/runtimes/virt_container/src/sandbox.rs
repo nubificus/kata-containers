@@ -5,6 +5,7 @@
 //
 //
 use vagent::construct_unix;
+//use std::path::Path;
 
 use std::sync::Arc;
 
@@ -181,20 +182,7 @@ impl Sandbox for VirtSandbox {
             .context("prepare vm")?;
       
         let hypervisor_config = self.hypervisor.hypervisor_config().await;
-        let endpoint_source = [KATA_PATH, id, "root", "kata.hvsock"].join("/");
-        info!(sl!(), "ENDPOINT SOURCE: {}",endpoint_source);
-        let endpoint = construct_unix(endpoint_source,hypervisor_config.vaccel_args.endpoint_port.to_string()).await?; 
-
-        let _ = match vaccelrt_agent::new(&endpoint){
-            Ok(mut server) => {
-                info!(sl!(), "INTEGRATED VAGENT STARTED");
-                server.start().context("failed to start vagent")
-            },
-            Err(_) =>{
-                warn!(sl!(), "vagent was not created");
-                Ok(())
-            }
-        };
+        
         
         // generate device and setup before start vm
         // should after hypervisor.prepare_vm
@@ -296,6 +284,7 @@ impl Sandbox for VirtSandbox {
         });
         self.monitor.start(id, self.agent.clone());
         self.save().await.context("save state")?;
+        let _=start_vagent(id,hypervisor_config.vaccel_args.endpoint_port).await;
         Ok(())
     }
 
@@ -389,6 +378,26 @@ impl Sandbox for VirtSandbox {
             .context("sandbox: failed to get iptables")?;
         Ok(resp.data)
     }
+}
+
+async fn start_vagent(id: &str, port: String)->Result<()>{
+        let endpoint_source = [KATA_PATH, id, "root", "kata.hvsock"].join("/");
+        info!(sl!(), "ENDPOINT SOURCE: {}",endpoint_source);
+        let endpoint = construct_unix(endpoint_source,port.to_string()).await?; 
+        info!(sl!(), "ENDPOINT: {}",endpoint);
+        
+        //while !Path::new(&endpoint).exists() {}
+        let _ = match vaccelrt_agent::new(&endpoint){
+            Ok(mut server) => {
+                info!(sl!(), "INTEGRATED VAGENT STARTED");
+                server.start().context("failed to start vagent")
+            },
+            Err(e) =>{
+                warn!(sl!(), "vagent was not created because of error: {}",e);
+                Ok(())
+            }
+        };
+        Ok(())
 }
 
 #[async_trait]
