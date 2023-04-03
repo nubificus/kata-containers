@@ -387,7 +387,7 @@ async fn start_vagent(id: &str, port: String)->Result<()>{
         info!(sl!(), "ENDPOINT: {}",endpoint);
         
         //while !Path::new(&endpoint).exists() {}
-        let _ = match vaccelrt_agent::new(&endpoint){
+        let _ = match vlib::new(&endpoint){
             Ok(mut server) => {
                 info!(sl!(), "INTEGRATED VAGENT STARTED");
                 server.start().context("failed to start vagent")
