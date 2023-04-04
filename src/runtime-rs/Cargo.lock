@@ -2472,6 +2472,7 @@ dependencies = [
 name = "runtimes"
 version = "0.1.0"
 dependencies = [
+ "agent",
  "anyhow",
  "common",
  "hyper",
@@ -2490,6 +2491,7 @@ dependencies = [
  "slog",
  "slog-scope",
  "tokio",
+ "url",
  "virt_container",
  "wasm_container",
 ]

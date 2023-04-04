@@ -143,6 +143,11 @@ impl DragonballInner {
         Ok(master_tid)
     }
 
+    pub(crate) async fn get_ns_path(&self) -> Result<String> {
+        let ns_path = self.vmm_instance.get_ns_path();
+        Ok(ns_path)
+    }
+
     pub(crate) async fn check(&self) -> Result<()> {
         Ok(())
     }
