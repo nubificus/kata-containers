@@ -212,7 +212,7 @@ impl DeviceManager {
                 // TODO https://github.com/kata-containers/kata-containers/issues/6525
                 todo!()
             }
-
+            // vhost-user TODO https://github.com/kata-containers/kata-containers/issues/6526
             _ => Arc::new(Mutex::new(Box::new(GenericDevice::new(dev_info)))),
         };
         Ok(dev)

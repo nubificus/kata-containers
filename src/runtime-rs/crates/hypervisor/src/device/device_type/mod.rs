@@ -25,6 +25,7 @@ pub use vsock::{HybridVsockConfig, VsockConfig};
 mod generic;
 pub use generic::{GenericConfig, GenericDevice};
 use std::fmt;
+pub mod vhost_user_device;
 
 #[derive(Debug)]
 pub enum DeviceConfig {
