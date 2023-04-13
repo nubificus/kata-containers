@@ -209,7 +209,7 @@ impl DeviceManager {
                 ))))
             }
             DeviceType::Vfio => {
-                // TODO: do something for vfio device
+                // TODO https://github.com/kata-containers/kata-containers/issues/6525
                 todo!()
             }
 
