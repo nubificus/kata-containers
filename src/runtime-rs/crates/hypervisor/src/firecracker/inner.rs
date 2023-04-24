@@ -80,6 +80,7 @@ impl FcInner {
     pub(crate) async fn start_vm(&mut self, _timeout: i32) -> Result<()> {
         info!(sl!(), "Starting Firecracker");
         self.instance_start().await?;
+        self.patch_container_rootfs().await?;
 //        self.patch("/drives/drive1");
 //        let body_container_rootfs: String = json!({
 //              "drive_id": "drive1",
@@ -186,12 +187,34 @@ impl FcInner {
               "is_read_only": true
         })
         .to_string();
+
+        let body_dummy: String = json!({
+              "drive_id": "drive1",
+              "path_on_host": "/opt/kata/share/kata-containers2/rootfs3.ext4",
+              "is_root_device": false,
+              "is_read_only": true
+        })
+        .to_string();
+        
+
         //FIXME busywait
         // similar to
         // https://github.com/kata-containers/kata-containers/blob/109071855df8d73af9bb089c2a4a1d9006c08bb3/src/runtime-rs/crates/hypervisor/src/ch/inner_hypervisor.rs#L163
         while !Path::new(&self.asock_path).exists() {}
         self.put("/boot-source", body_kernel).await?;
         self.put("/drives/rootfs", body_rootfs).await?;
+        self.put("/drives/drive1", body_dummy).await?;
+        //info!(sl!(), "PUT Request DUMMY");
+        Ok(())
+    }
+    pub(crate) async fn patch_container_rootfs(&mut self)-> Result<()>{
+        let body_dummy: String = json!({
+              "drive_id": "drive1",
+              "path_on_host": "/opt/kata/share/kata-containers2/rootfs3.ext4",
+        })
+        .to_string();
+        while !Path::new(&self.asock_path).exists() {}
+        self.patch("/drives/drive1", body_dummy).await?;
         Ok(())
     }
 

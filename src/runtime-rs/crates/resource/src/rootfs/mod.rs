@@ -112,7 +112,6 @@ impl RootFsResource {
                 }else {
                     //due to fc having no share_fs and hypervisor trair having type erasure it is
                     //really hard to construct an else if statement so we just use else for now
-                    info!(sl!(),"HIIIII");
                     Arc::new(
                         devmapper_rootfs::DevmapperRootfs::new(&layer)
                         .await

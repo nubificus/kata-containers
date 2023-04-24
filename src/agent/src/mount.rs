@@ -169,14 +169,14 @@ pub fn baremount(
 
     info!(
         logger,
-        "baremount source={:?}, dest={:?}, fs_type={:?}, options={:?}, flags={:?}",
+        "baremount source HPE={:?}, dest={:?}, fs_type={:?}, options={:?}, flags={:?}",
         source,
         destination,
         fs_type,
         options,
         flags
     );
-
+    info!(logger, "BEFORE MOUNT");
     nix::mount::mount(
         Some(source),
         destination,

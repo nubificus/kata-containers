@@ -14,7 +14,9 @@ pub(crate) struct DevmapperRootfs {
 
 impl DevmapperRootfs {
     pub async fn new(rootfs: &Mount) -> Result<Self>{
-        let placeholder = rootfs.destination.as_path().display().to_string();
+        //.as_path().display().to_string()
+        let placeholder = &(rootfs.source).to_string();
+        info!(sl!(),"ROOTFS PATH: {:?}", placeholder);
         Ok(DevmapperRootfs {
             //placeholder for now
             guest_path: placeholder
