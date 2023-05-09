@@ -19,6 +19,8 @@ use crate::share_fs::ShareFs;
 
 use self::{block_rootfs::is_block_rootfs, nydus_rootfs::NYDUS_ROOTFS_TYPE};
 
+use hypervisor::HYPERVISOR_FIRECRACKER;
+
 const ROOTFS: &str = "rootfs";
 const HYBRID_ROOTFS_LOWER_DIR: &str = "rootfs_lower";
 const TYPE_OVERLAY_FS: &str = "overlay";
@@ -63,7 +65,7 @@ impl RootFsResource {
         root: &oci::Root,
         bundle_path: &str,
         rootfs_mounts: &[Mount],
-    ) -> Result<Arc<dyn Rootfs>> {
+        ) -> Result<Arc<dyn Rootfs>> {
         match rootfs_mounts {
             // if rootfs_mounts is empty
             mounts_vec if mounts_vec.is_empty() => {

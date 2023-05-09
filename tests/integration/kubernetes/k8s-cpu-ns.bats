@@ -10,6 +10,8 @@ load "${BATS_TEST_DIRNAME}/tests_common.sh"
 
 setup() {
 	[ "${KATA_HYPERVISOR}" == "firecracker" ] && skip "test not working see: ${fc_limitations}"
+	[ "${KATA_HYPERVISOR}" == "dragonball" ] && skip "test not working see: ${dragonball_limitations}"
+	[ "${KATA_HYPERVISOR}" == "qemu-tdx" ] && skip "TEEs do not support memory / CPU hotplug"
 
 	pod_name="constraints-cpu-test"
 	container_name="first-cpu-container"
@@ -25,6 +27,8 @@ setup() {
 
 @test "Check CPU constraints" {
 	[ "${KATA_HYPERVISOR}" == "firecracker" ] && skip "test not working see: ${fc_limitations}"
+	[ "${KATA_HYPERVISOR}" == "dragonball" ] && skip "test not working see: ${dragonball_limitations}"
+	[ "${KATA_HYPERVISOR}" == "qemu-tdx" ] && skip "TEEs do not support memory / CPU hotplug"
 
 	# Create the pod
 	kubectl create -f "${pod_config_dir}/pod-cpu.yaml"
@@ -68,6 +72,8 @@ setup() {
 
 teardown() {
 	[ "${KATA_HYPERVISOR}" == "firecracker" ] && skip "test not working see: ${fc_limitations}"
+	[ "${KATA_HYPERVISOR}" == "dragonball" ] && skip "test not working see: ${dragonball_limitations}"
+	[ "${KATA_HYPERVISOR}" == "qemu-tdx" ] && skip "TEEs do not support memory / CPU hotplug"
 
 	# Debugging information
 	kubectl describe "pod/$pod_name"

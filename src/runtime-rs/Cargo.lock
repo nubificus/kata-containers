@@ -50,7 +50,7 @@ dependencies = [
  "logging",
  "nix 0.24.3",
  "oci",
- "protobuf",
+ "protobuf 3.2.0",
  "protocols",
  "serde",
  "serde_json",
@@ -486,7 +486,7 @@ dependencies = [
  "nix 0.24.3",
  "oci",
  "persist",
- "protobuf",
+ "protobuf 3.2.0",
  "serde_json",
  "slog",
  "slog-scope",
@@ -519,13 +519,14 @@ checksum = "f3ad85c1f65dc7b37604eb0e89748faf0b9653065f2a8ef69f96a687ec1e9279"
 
 [[package]]
 name = "containerd-shim-protos"
-version = "0.2.0"
+version = "0.3.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "077ec778a0835d9d85502e8535362130187759b69eddabe2bdb3a68ffb575bd0"
+checksum = "ef45f1c71aa587d8f657c546d8da38ea04f113dd05da0ef993c4515fa25fbdd1"
 dependencies = [
  "async-trait",
- "protobuf",
+ "protobuf 3.2.0",
  "ttrpc",
+ "ttrpc-codegen",
 ]
 
 [[package]]
@@ -566,6 +567,30 @@ checksum = "cf2b3e8478797446514c91ef04bafcb59faba183e621ad488df88983cc14128c"
 dependencies = [
  "cfg-if 1.0.0",
  "crossbeam-utils",
+]
+
+[[package]]
+name = "crossbeam-deque"
+version = "0.8.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "715e8152b692bba2d374b53d4875445368fdf21a94751410af607a5ac677d1fc"
+dependencies = [
+ "cfg-if 1.0.0",
+ "crossbeam-epoch",
+ "crossbeam-utils",
+]
+
+[[package]]
+name = "crossbeam-epoch"
+version = "0.9.13"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "01a9af1f4c2ef74bb8aa1f7e19706bc72d03598c8a570bb5de72243c7a9d9d5a"
+dependencies = [
+ "autocfg",
+ "cfg-if 1.0.0",
+ "crossbeam-utils",
+ "memoffset 0.7.1",
+ "scopeguard",
 ]
 
 [[package]]
@@ -942,6 +967,7 @@ dependencies = [
 ]
 
 [[package]]
+<<<<<<< HEAD
 name = "filetime"
 version = "0.2.20"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -954,6 +980,47 @@ dependencies = [
 ]
 
 [[package]]
+name = "firec"
+version = "0.2.0"
+source = "git+https://github.com/nubificus/firec?branch=v2#e814fc84e75d1cad6c628fb0678b91935e3c6393"
+dependencies = [
+ "derivative",
+ "futures-util",
+ "hyper",
+ "hyperlocal",
+ "serde",
+ "serde_json",
+ "sysinfo",
+ "thiserror",
+ "tokio",
+ "tracing",
+ "users",
+ "uuid 1.2.2",
+]
+
+[[package]]
+||||||| constructed merge base
+name = "firec"
+version = "0.2.0"
+source = "git+https://github.com/nubificus/firec?branch=v2#e814fc84e75d1cad6c628fb0678b91935e3c6393"
+dependencies = [
+ "derivative",
+ "futures-util",
+ "hyper",
+ "hyperlocal",
+ "serde",
+ "serde_json",
+ "sysinfo",
+ "thiserror",
+ "tokio",
+ "tracing",
+ "users",
+ "uuid 1.2.2",
+]
+
+[[package]]
+=======
+>>>>>>> patch and started devices
 name = "fixedbitset"
 version = "0.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1188,6 +1255,82 @@ dependencies = [
 ]
 
 [[package]]
+name = "governor"
+version = "0.4.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "7df0ee4b237afb71e99f7e2fbd840ffec2d6c4bb569f69b2af18aa1f63077d38"
+dependencies = [
+ "dashmap",
+ "futures 0.3.21",
+ "futures-timer",
+ "no-std-compat",
+ "nonzero_ext",
+ "parking_lot 0.11.2",
+ "quanta",
+ "rand 0.8.5",
+ "smallvec",
+]
+
+[[package]]
+<<<<<<< HEAD
+name = "governor"
+version = "0.4.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "7df0ee4b237afb71e99f7e2fbd840ffec2d6c4bb569f69b2af18aa1f63077d38"
+dependencies = [
+ "dashmap",
+ "futures 0.3.21",
+ "futures-timer",
+ "no-std-compat",
+ "nonzero_ext",
+ "parking_lot 0.11.2",
+ "quanta",
+ "rand 0.8.5",
+ "smallvec",
+]
+
+[[package]]
+name = "h2"
+version = "0.3.15"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "5f9f29bc9dda355256b2916cf526ab02ce0aeaaaf2bad60d65ef3f12f11dd0f4"
+dependencies = [
+ "bytes 1.1.0",
+ "fnv",
+ "futures-core",
+ "futures-sink",
+ "futures-util",
+ "http",
+ "indexmap",
+ "slab",
+ "tokio",
+ "tokio-util",
+ "tracing",
+]
+
+[[package]]
+||||||| constructed merge base
+name = "h2"
+version = "0.3.15"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "5f9f29bc9dda355256b2916cf526ab02ce0aeaaaf2bad60d65ef3f12f11dd0f4"
+dependencies = [
+ "bytes 1.1.0",
+ "fnv",
+ "futures-core",
+ "futures-sink",
+ "futures-util",
+ "http",
+ "indexmap",
+ "slab",
+ "tokio",
+ "tokio-util",
+ "tracing",
+]
+
+[[package]]
+=======
+>>>>>>> patch and started devices
 name = "hashbrown"
 version = "0.12.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1308,8 +1451,16 @@ dependencies = [
  "crossbeam-channel",
  "dbs-utils",
  "dragonball",
+<<<<<<< HEAD
  "futures 0.3.26",
+ "firec",
+||||||| constructed merge base
+ "firec",
+=======
+>>>>>>> patch and started devices
  "go-flag",
+ "hyper",
+ "hyperlocal",
  "kata-sys-util",
  "kata-types",
  "libc",
@@ -1326,9 +1477,12 @@ dependencies = [
  "shim-interface",
  "slog",
  "slog-scope",
+ "sysinfo",
  "thiserror",
  "tokio",
  "vmm-sys-util 0.11.1",
+ "uuid 1.2.2",
+ "vmm-sys-util 0.11.0",
 ]
 
 [[package]]
@@ -1759,6 +1913,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "netns-rs"
+version = "0.1.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "23541694f1d7d18cd1a0da3a1352a6ea48b01cbb4a8e7a6e547963823fd5276e"
+dependencies = [
+ "nix 0.23.2",
+ "thiserror",
+]
+
+[[package]]
 name = "nix"
 version = "0.23.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1809,6 +1973,15 @@ dependencies = [
  "memoffset 0.7.1",
  "pin-utils",
  "static_assertions",
+]
+
+[[package]]
+name = "ntapi"
+version = "0.3.7"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "c28774a7fd2fbb4f0babd8237ce554b73af68021b5f695a3cebd6c59bac0980f"
+dependencies = [
+ "winapi",
 ]
 
 [[package]]
@@ -2216,9 +2389,16 @@ name = "protobuf"
 version = "2.28.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "106dd99e98437432fed6519dedecfade6a06a73bb7b2a1e019fdd2bee5778d94"
+
+[[package]]
+name = "protobuf"
+version = "3.2.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "b55bad9126f378a853655831eb7363b7b01b81d19f8cb1218861086ca4a1a61e"
 dependencies = [
- "serde",
- "serde_derive",
+ "once_cell",
+ "protobuf-support",
+ "thiserror",
 ]
 
 [[package]]
@@ -2227,36 +2407,47 @@ version = "2.28.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "033460afb75cf755fcfc16dfaed20b86468082a2ea24e05ac35ab4a099a017d6"
 dependencies = [
- "protobuf",
+ "protobuf 2.28.0",
 ]
 
 [[package]]
-name = "protobuf-codegen-pure"
-version = "2.28.0"
+name = "protobuf-codegen"
+version = "3.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "95a29399fc94bcd3eeaa951c715f7bea69409b2445356b00519740bcd6ddd865"
+checksum = "0dd418ac3c91caa4032d37cb80ff0d44e2ebe637b2fb243b6234bf89cdac4901"
 dependencies = [
- "protobuf",
- "protobuf-codegen",
+ "anyhow",
+ "once_cell",
+ "protobuf 3.2.0",
+ "protobuf-parse",
+ "regex",
+ "tempfile",
+ "thiserror",
 ]
 
 [[package]]
-name = "protobuf-codegen-pure3"
-version = "2.28.2"
+name = "protobuf-parse"
+version = "3.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b351add14db0721ad0842f4858aec11a5088684112ef163fc50f113c63e69b2e"
+checksum = "9d39b14605eaa1f6a340aec7f320b34064feb26c93aec35d6a9a2272a8ddfa49"
 dependencies = [
- "protobuf",
- "protobuf-codegen3",
+ "anyhow",
+ "indexmap",
+ "log",
+ "protobuf 3.2.0",
+ "protobuf-support",
+ "tempfile",
+ "thiserror",
+ "which",
 ]
 
 [[package]]
-name = "protobuf-codegen3"
-version = "2.28.2"
+name = "protobuf-support"
+version = "3.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "73c5878d0fa872bd7d61782c6aa2d2d56761ba4ed4514eb6992f5f83162f1d2f"
+checksum = "a5d4d7b8601c814cfb36bcebb79f0e61e45e1e93640cf778837833bbed05c372"
 dependencies = [
- "protobuf",
+ "thiserror",
 ]
 
 [[package]]
@@ -2265,7 +2456,7 @@ version = "0.1.0"
 dependencies = [
  "async-trait",
  "oci",
- "protobuf",
+ "protobuf 3.2.0",
  "ttrpc",
  "ttrpc-codegen",
 ]
@@ -2389,6 +2580,37 @@ dependencies = [
 ]
 
 [[package]]
+name = "raw-cpuid"
+version = "10.3.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "738bc47119e3eeccc7e94c4a506901aea5e7b4944ecd0829cbebf4af04ceda12"
+dependencies = [
+ "bitflags",
+]
+
+[[package]]
+name = "rayon"
+version = "1.6.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "6db3a213adf02b3bcfd2d3846bb41cb22857d131789e01df434fb7e7bc0759b7"
+dependencies = [
+ "either",
+ "rayon-core",
+]
+
+[[package]]
+name = "rayon-core"
+version = "1.10.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "cac410af5d00ab6884528b4ab69d1e8e146e8d471201800fa1b4524126de6ad3"
+dependencies = [
+ "crossbeam-channel",
+ "crossbeam-deque",
+ "crossbeam-utils",
+ "num_cpus",
+]
+
+[[package]]
 name = "rdrand"
 version = "0.4.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2435,6 +2657,7 @@ dependencies = [
  "byte-unit 4.0.18",
  "cgroups-rs",
  "futures 0.3.26",
+ "hex",
  "hypervisor",
  "kata-sys-util",
  "kata-types",
@@ -2443,6 +2666,7 @@ dependencies = [
  "logging",
  "netlink-packet-route",
  "netlink-sys",
+ "netns-rs",
  "nix 0.24.3",
  "oci",
  "persist",
@@ -2456,7 +2680,7 @@ dependencies = [
  "tempfile",
  "test-utils",
  "tokio",
- "uuid",
+ "uuid 0.4.0",
 ]
 
 [[package]]
@@ -2498,9 +2722,11 @@ dependencies = [
  "lazy_static",
  "linux_container",
  "logging",
+ "netns-rs",
  "nix 0.25.1",
  "oci",
  "persist",
+ "resource",
  "serde_json",
  "shim-interface",
  "slog",
@@ -2706,7 +2932,7 @@ dependencies = [
  "logging",
  "nix 0.24.3",
  "oci",
- "protobuf",
+ "protobuf 3.2.0",
  "rand 0.8.5",
  "serial_test",
  "service",
@@ -2888,6 +3114,21 @@ dependencies = [
  "proc-macro2",
  "quote",
  "unicode-ident",
+]
+
+[[package]]
+name = "sysinfo"
+version = "0.23.13"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "3977ec2e0520829be45c8a2df70db2bf364714d8a748316a10c3c35d4d2b01c9"
+dependencies = [
+ "cfg-if 1.0.0",
+ "core-foundation-sys",
+ "libc",
+ "ntapi",
+ "once_cell",
+ "rayon",
+ "winapi",
 ]
 
 [[package]]
@@ -3134,11 +3375,11 @@ checksum = "8ce8c33a8d48bd45d624a6e523445fd21ec13d3653cd51f681abf67418f54eb8"
 dependencies = [
  "cfg-if 1.0.0",
  "pin-project-lite",
- "tracing-attributes",
  "tracing-core",
 ]
 
 [[package]]
+<<<<<<< HEAD
 name = "tracing-attributes"
 version = "0.1.23"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3150,6 +3391,20 @@ dependencies = [
 ]
 
 [[package]]
+||||||| constructed merge base
+name = "tracing-attributes"
+version = "0.1.22"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "11c75893af559bc8e10716548bdef5cb2b983f8e637db9d0e15126b61b484ee2"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "syn",
+]
+
+[[package]]
+=======
+>>>>>>> patch and started devices
 name = "tracing-core"
 version = "0.1.30"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3166,9 +3421,9 @@ checksum = "3528ecfd12c466c6f163363caf2d02a71161dd5e1cc6ae7b34207ea2d42d81ed"
 
 [[package]]
 name = "ttrpc"
-version = "0.6.1"
+version = "0.7.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "2ecfff459a859c6ba6668ff72b34c2f1d94d9d58f7088414c2674ad0f31cc7d8"
+checksum = "a35f22a2964bea14afee161665bb260b83cb48e665e0260ca06ec0e775c8b06c"
 dependencies = [
  "async-trait",
  "byteorder",
@@ -3176,8 +3431,8 @@ dependencies = [
  "libc",
  "log",
  "nix 0.23.2",
- "protobuf",
- "protobuf-codegen-pure",
+ "protobuf 3.2.0",
+ "protobuf-codegen 3.2.0",
  "thiserror",
  "tokio",
  "tokio-vsock",
@@ -3185,28 +3440,28 @@ dependencies = [
 
 [[package]]
 name = "ttrpc-codegen"
-version = "0.2.3"
+version = "0.4.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "2365c9179ad82b29bda1b0162c7542ab5861a7844abfedd8cfdf8bd7e12358f9"
+checksum = "94d7f7631d7a9ebed715a47cd4cb6072cbc7ae1d4ec01598971bbec0024340c2"
 dependencies = [
- "protobuf",
- "protobuf-codegen-pure3",
- "protobuf-codegen3",
+ "protobuf 2.28.0",
+ "protobuf-codegen 3.2.0",
+ "protobuf-support",
  "ttrpc-compiler",
 ]
 
 [[package]]
 name = "ttrpc-compiler"
-version = "0.4.3"
+version = "0.6.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ed57c2d6669099791507b8b491b2940f2e8975b52a73fe82efad24257d10e9bc"
+checksum = "ec3cb5dbf1f0865a34fe3f722290fe776cacb16f50428610b779467b76ddf647"
 dependencies = [
  "derive-new",
  "prost",
  "prost-build",
  "prost-types",
- "protobuf",
- "protobuf-codegen3",
+ "protobuf 2.28.0",
+ "protobuf-codegen 2.28.0",
  "tempfile",
 ]
 
@@ -3270,18 +3525,43 @@ dependencies = [
 ]
 
 [[package]]
+<<<<<<< HEAD
 name = "utf8-width"
 version = "0.1.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "5190c9442dcdaf0ddd50f37420417d219ae5261bbf5db120d0f9bab996c9cba1"
 
 [[package]]
-name = "uuid"
-version = "0.4.0"
+name = "users"
+version = "0.11.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "7cfec50b0842181ba6e713151b72f4ec84a6a7e2c9c8a8a3ffc37bb1cd16b231"
+checksum = "24cc0f6d6f267b73e5a2cadf007ba8f9bc39c6a6f9666f8cf25ea809a153b032"
 dependencies = [
- "rand 0.3.23",
+ "libc",
+ "log",
+]
+
+[[package]]
+||||||| constructed merge base
+name = "users"
+version = "0.11.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "24cc0f6d6f267b73e5a2cadf007ba8f9bc39c6a6f9666f8cf25ea809a153b032"
+dependencies = [
+ "libc",
+ "log",
+]
+
+[[package]]
+=======
+>>>>>>> patch and started devices
+name = "uuid"
+version = "1.2.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "422ee0de9031b5b948b97a8fc04e3aa35230001a722ddd27943e0be31564ce4c"
+dependencies = [
+ "getrandom 0.2.6",
+ "serde",
 ]
 
 [[package]]
@@ -3327,7 +3607,7 @@ dependencies = [
  "nix 0.24.3",
  "oci",
  "persist",
- "protobuf",
+ "protobuf 3.2.0",
  "resource",
  "serde",
  "serde_derive",

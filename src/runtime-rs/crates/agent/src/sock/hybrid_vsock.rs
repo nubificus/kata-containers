@@ -70,12 +70,12 @@ async fn connect_helper(uds: &str, port: u32) -> Result<UnixStream> {
     let mut reads = BufReader::new(&mut stream);
     let mut response = String::new();
     reads.read_line(&mut response).await.context("read line")?;
-    //info!(sl!(), "get socket resp: {}", response);
+    info!(sl!(), "get socket resp: {}", response);
     if !response.contains("OK") {
         return Err(anyhow!(
-            "handshake error: malformed response code: {:?}",
-            response
-        ));
+                "handshake error: malformed response code: {:?}",
+                response
+                ));
     }
     Ok(stream)
 }
