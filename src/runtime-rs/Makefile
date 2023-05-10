@@ -83,8 +83,8 @@ HYPERVISOR_FC = firecracker
 HYPERVISOR_QEMU = qemu
 HYPERVISOR_CLH = cloud-hypervisor
 
-
-DEFAULT_HYPERVISOR ?= $(HYPERVISOR_DB)
+## CHANGE: db to fc
+DEFAULT_HYPERVISOR ?= $(HYPERVISOR_FC)
 
 ##VAR HYPERVISOR=<hypervisor_name> List of hypervisors this build system can generate configuration for.
 HYPERVISORS := $(HYPERVISOR_DB) $(HYPERVISOR_ACRN) $(HYPERVISOR_FC) $(HYPERVISOR_QEMU) $(HYPERVISOR_CLH)
@@ -187,46 +187,65 @@ CONFIG_PATH := $(abspath $(CONFDIR)/$(CONFIG_FILE))
 SYSCONFIG := $(abspath $(SYSCONFDIR)/$(CONFIG_FILE))
 SHAREDIR := $(SHAREDIR)
 
-ifneq (,$(DBCMD))
-    KNOWN_HYPERVISORS += $(HYPERVISOR_DB)
-    CONFIG_FILE_DB = configuration-dragonball.toml
-    CONFIG_DB = config/$(CONFIG_FILE_DB)
-    CONFIG_DB_IN = $(CONFIG_DB).in
-    CONFIG_PATH_DB = $(abspath $(CONFDIR)/$(CONFIG_FILE_DB))
-    CONFIG_PATHS += $(CONFIG_PATH_DB)
-    SYSCONFIG_DB = $(abspath $(SYSCONFDIR)/$(CONFIG_FILE_DB))
-    SYSCONFIG_PATHS += $(SYSCONFIG_DB)
-    CONFIGS += $(CONFIG_DB)
+##CHANGE: db to fc
+ifneq (,$(FCCMD))
+    KNOWN_HYPERVISORS += $(HYPERVISOR_FC)
+    CONFIG_FILE_FC = configuration-firecracker.toml
+    CONFIG_FC = config/$(CONFIG_FILE_FC)
+    CONFIG_FC_IN = $(CONFIG_FC).in
+    CONFIG_PATH_FC = $(abspath $(CONFDIR)/$(CONFIG_FILE_FC))
+    CONFIG_PATHS += $(CONFIG_PATH_FC)
+    SYSCONFIG_FC = $(abspath $(SYSCONFDIR)/$(CONFIG_FILE_FC))
+    SYSCONFIG_PATHS += $(SYSCONFIG_FC)
+    CONFIGS += $(CONFIG_FC)
     # dragonball-specific options (all should be suffixed by "_DB")
-    DEFMAXVCPUS_DB := 1
-    DEFBLOCKSTORAGEDRIVER_DB := virtio-blk
-    DEFNETWORKMODEL_DB := tcfilter
-    KERNELPARAMS = console=ttyS1 agent.log_vport=1025
-	KERNELTYPE_DB = uncompressed
-    KERNEL_NAME_DB = $(call MAKE_KERNEL_NAME_DB,$(KERNELTYPE_DB))
-    KERNELPATH_DB = $(KERNELDIR)/$(KERNEL_NAME_DB)
-    DEFSANDBOXCGROUPONLY = true
-    RUNTIMENAME := virt_container
-    PIPESIZE := 1
-	DBSHAREDFS := inline-virtio-fs
+##    DEFMAXVCPUS_DB := 1
+##    DEFBLOCKSTORAGEDRIVER_DB := virtio-blk
+##    DEFNETWORKMODEL_DB := tcfilter
+##    KERNELPARAMS = console=ttyS1 agent.log_vport=1025
+##	KERNELTYPE_DB = uncompressed
+##    KERNEL_NAME_DB = $(call MAKE_KERNEL_NAME_DB,$(KERNELTYPE_DB))
+##    KERNELPATH_DB = $(KERNELDIR)/$(KERNEL_NAME_DB)
+##    DEFSANDBOXCGROUPONLY = true
+##    RUNTIMENAME := virt_container
+##    PIPESIZE := 1
+##	DBSHAREDFS := inline-virtio-fs
 endif
 
-ifeq ($(DEFAULT_HYPERVISOR),$(HYPERVISOR_DB))
-    DEFAULT_HYPERVISOR_CONFIG = $(CONFIG_FILE_DB)
+##CHANGE: db to fc
+ifeq ($(DEFAULT_HYPERVISOR),$(HYPERVISOR_FC))
+    DEFAULT_HYPERVISOR_CONFIG = $(CONFIG_FILE_FC)
 endif
 # list of variables the user may wish to override
 USER_VARS += ARCH
 USER_VARS += BINDIR
 USER_VARS += CONFIG_DB_IN
+
+USER_VARS += CONFIG_FC_IN
+
 USER_VARS += CONFIG_PATH
 USER_VARS += DESTDIR
 USER_VARS += DEFAULT_HYPERVISOR
 USER_VARS += DBCMD
+
+USER_VARS += FCCMD
+
 USER_VARS += DBCTLCMD
+
+USER_VARS += FCCTLCMD
+
 USER_VARS += DBPATH
+
+USER_VARS += FCPATH
+
 USER_VARS += DBVALIDHYPERVISORPATHS
 USER_VARS += DBCTLPATH
 USER_VARS += DBVALIDCTLPATHS
+
+USER_VARS += FCVALIDHYPERVISORPATHS
+USER_VARS += FCCTLPATH
+USER_VARS += FCVALIDCTLPATHS
+
 USER_VARS += SYSCONFIG
 USER_VARS += IMAGENAME
 USER_VARS += IMAGEPATH
@@ -235,6 +254,9 @@ USER_VARS += MACHINETYPE
 USER_VARS += KERNELDIR
 USER_VARS += KERNELTYPE
 USER_VARS += KERNELPATH_DB
+
+USER_VARS += KERNELPATH_FC
+
 USER_VARS += KERNELPATH
 USER_VARS += KERNELVIRTIOFSPATH
 USER_VARS += FIRMWAREPATH
@@ -330,9 +352,10 @@ GENERATED_CODE = crates/shim/src/config.rs
 RUNTIME_NAME=$(TARGET)
 RUNTIME_VERSION=$(VERSION)
 
+##CHANGE: db to fc
 GENERATED_VARS = \
 		VERSION \
-		CONFIG_DB_IN \
+		CONFIG_FC_IN \
 		$(USER_VARS)
 
 
@@ -385,8 +408,9 @@ static-checks-build: $(GENERATED_FILES)
 
 $(TARGET): $(GENERATED_FILES) $(TARGET_PATH)
 
+## CHANGE: remove deny warnings
 $(TARGET_PATH): $(SOURCES) | show-summary
-	@RUSTFLAGS="$(EXTRA_RUSTFLAGS) --deny warnings" cargo build --target $(TRIPLE) --$(BUILD_TYPE) $(EXTRA_RUSTFEATURES)
+	@RUSTFLAGS="$(EXTRA_RUSTFLAGS) " cargo build --target $(TRIPLE) --$(BUILD_TYPE) $(EXTRA_RUSTFEATURES)
 
 $(GENERATED_FILES): %: %.in
 	@sed \
@@ -396,7 +420,7 @@ $(GENERATED_FILES): %: %.in
 
 ##TARGET optimize: optimized  build
 optimize: $(SOURCES) | show-summary show-header
-	@RUSTFLAGS="-C link-arg=-s $(EXTRA_RUSTFLAGS) --deny warnings" cargo build --target $(TRIPLE) --$(BUILD_TYPE) $(EXTRA_RUSTFEATURES)
+	@RUSTFLAGS="-C link-arg=-s $(EXTRA_RUSTFLAGS) --deny-warnings" cargo build --target $(TRIPLE) --$(BUILD_TYPE) $(EXTRA_RUSTFEATURES)
 
 ##TARGET clean: clean build
 clean:

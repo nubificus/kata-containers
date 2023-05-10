@@ -37,6 +37,9 @@ use crate::{eother, resolve_path, sl, validate_path};
 mod dragonball;
 pub use self::dragonball::{DragonballConfig, HYPERVISOR_NAME_DRAGONBALL};
 
+mod firecracker;
+pub use self::firecracker::{FirecrackerConfig, HYPERVISOR_NAME_FIRECRACKER};
+
 mod qemu;
 pub use self::qemu::{QemuConfig, HYPERVISOR_NAME_QEMU};
 

@@ -85,3 +85,17 @@ pub const DEFAULT_CH_PCI_BRIDGES: u32 = 2;
 pub const MAX_CH_PCI_BRIDGES: u32 = 5;
 pub const MAX_CH_VCPUS: u32 = 256;
 pub const MIN_CH_MEMORY_SIZE_MB: u32 = 64;
+
+//Default configuration for firecracker
+pub const DEFAULT_FIRECRACKER_BINARY_PATH: &str = "/usr/bin/firecracker";
+//prob not needed and will be deleted in the future
+pub const DEFAULT_FIRECRACKER_SOCKET_PATH: &str = "/tmp/firecracker.socket";
+pub const DEFAULT_FIRECRACKER_ENTROPY_SOURCE: &str = "/dev/urandom";
+pub const DEFAULT_FIRECRACKER_MEMORY_SIZE_MB : u32 = 128;
+pub const DEFAULT_FIRECRACKER_VCPUS : u32 = 1;
+pub const DEFAULT_FIRECRACKER_GUEST_KERNEL_IMAGE : &str = "vmlinux";
+//Could change this to empty
+pub const DEFAULT_FIRECRACKER_GUEST_KERNEL_PARAMS : &str = "console=ttyS0 reboot=k panic=1 pci=off";
+//there is no default min mem size but lets stick with the default for now
+pub const MAX_FIRECRACKER_VCPUS: u32 = 32;
+pub const MIN_FIRECRACKER_MEMORY_SIZE_MB: u32 = 128;
