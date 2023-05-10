@@ -24,7 +24,8 @@ use hypervisor::{dragonball::Dragonball, Hypervisor, HYPERVISOR_DRAGONBALL};
 use hypervisor::{firecracker::Firecracker, HYPERVISOR_FIRECRACKER};
 use hypervisor::{qemu::Qemu, HYPERVISOR_QEMU};
 use kata_types::config::{
-    hypervisor::register_hypervisor_plugin, DragonballConfig, FirecrackerConfig, QemuConfig, TomlConfig,
+    hypervisor::register_hypervisor_plugin, DragonballConfig, FirecrackerConfig, QemuConfig,
+    TomlConfig,
 };
 
 #[cfg(feature = "cloud-hypervisor")]
