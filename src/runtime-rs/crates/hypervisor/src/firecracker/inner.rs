@@ -40,6 +40,7 @@ pub struct FcInner {
     pub(crate) asock_path: String,
     pub(crate) state: VmmState,
     pub(crate) config: HypervisorConfig,
+    pub(crate) pid: Option<u32>,
     //pub(crate) config_json: ,
     pub(crate) client: Client<UnixConnector>,
     //pub(crate) has_conf: bool,
@@ -58,6 +59,7 @@ impl FcInner {
             asock_path: String::default(),
             state: VmmState::NotReady,
             config: Default::default(),
+            pid: None,
             //config_json: Path::new("").into(),
             client: Client::unix(),
             //has_conf: false,
@@ -103,6 +105,7 @@ impl FcInner {
         match child.id() {
             Some(id) => {
                 info!(sl!(), "Firecracker started successfully with id: {:?}", id);
+                self.pid=Some(id);
             }
             None => {
                 let exit_status = child.wait().await?;
@@ -344,12 +347,21 @@ impl FcInner {
 
     pub(crate) async fn get_vmm_master_tid(&self) -> Result<u32> {
         info!(sl!(), "FcInner: get vmm master tid");
-        todo!()
+        if let Some(pid) = self.pid {
+            Ok(pid)
+        } else {
+            Err(anyhow!("could not get vmm master tid"))
+        }
     }
 
     pub(crate) async fn get_ns_path(&self) -> Result<String> {
         info!(sl!(), "FcInner: get ns path");
-        todo!()
+        if let Some(pid) = self.pid {
+            let ns_path = format!("/proc/{}/ns", pid);
+            Ok(ns_path)
+        } else {
+            Err(anyhow!("could not get ns path"))
+        }
     }
 
     pub(crate) async fn cleanup(&self) -> Result<()> {
@@ -405,6 +417,7 @@ impl Persist for FcInner{
             asock_path: String::default(),
             state: VmmState::NotReady,
             config: hypervisor_state.config,
+            pid: None,
             //config_json: Path::new("").into(),
             client: Client::unix(),
             //has_conf: false,
