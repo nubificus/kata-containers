@@ -1,11 +1,13 @@
 mod inner;
 mod inner_device;
+mod inner_hypervisor;
+mod utils;
 
 use super::HypervisorState;
 use inner::FcInner;
 
-use persist::sandbox_persist::Persist;
 use anyhow::Context;
+use persist::sandbox_persist::Persist;
 
 use crate::{device_type::DeviceConfig, Hypervisor, VcpuThreadIds};
 
@@ -153,13 +155,10 @@ impl Persist for Firecracker {
     async fn restore(
         hypervisor_args: Self::ConstructorArgs,
         hypervisor_state: Self::State,
-        ) -> Result<Self> {
-        let inner =
-            FcInner::restore(hypervisor_args,
-                                     hypervisor_state).await?;
+    ) -> Result<Self> {
+        let inner = FcInner::restore(hypervisor_args, hypervisor_state).await?;
         Ok(Self {
-            inner:
-                Arc::new(RwLock::new(inner)),
+            inner: Arc::new(RwLock::new(inner)),
         })
     }
 }

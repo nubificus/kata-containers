@@ -187,7 +187,30 @@ CONFIG_PATH := $(abspath $(CONFDIR)/$(CONFIG_FILE))
 SYSCONFIG := $(abspath $(SYSCONFDIR)/$(CONFIG_FILE))
 SHAREDIR := $(SHAREDIR)
 
-## CHANGE: DB TO FC
+ifneq (,$(DBCMD))
+    KNOWN_HYPERVISORS += $(HYPERVISOR_DB)
+    CONFIG_FILE_DB = configuration-dragonball.toml
+    CONFIG_DB = config/$(CONFIG_FILE_DB)
+    CONFIG_DB_IN = $(CONFIG_DB).in
+    CONFIG_PATH_DB = $(abspath $(CONFDIR)/$(CONFIG_FILE_DB))
+    CONFIG_PATHS += $(CONFIG_PATH_DB)
+    SYSCONFIG_DB = $(abspath $(SYSCONFDIR)/$(CONFIG_FILE_DB))
+    SYSCONFIG_PATHS += $(SYSCONFIG_DB)
+    CONFIGS += $(CONFIG_DB)
+    # dragonball-specific options (all should be suffixed by "_DB")
+    DEFMAXVCPUS_DB := 1
+    DEFBLOCKSTORAGEDRIVER_DB := virtio-blk
+    DEFNETWORKMODEL_DB := tcfilter
+    KERNELPARAMS = console=ttyS1 agent.log_vport=1025
+	KERNELTYPE_DB = uncompressed
+    KERNEL_NAME_DB = $(call MAKE_KERNEL_NAME_DB,$(KERNELTYPE_DB))
+    KERNELPATH_DB = $(KERNELDIR)/$(KERNEL_NAME_DB)
+    DEFSANDBOXCGROUPONLY = true
+    RUNTIMENAME := virt_container
+    PIPESIZE := 1
+	DBSHAREDFS := inline-virtio-fs
+endif
+
 ifneq (,$(FCCMD))
     KNOWN_HYPERVISORS += $(HYPERVISOR_FC)
     CONFIG_FILE_FC = configuration-firecracker.toml
@@ -198,21 +221,12 @@ ifneq (,$(FCCMD))
     SYSCONFIG_FC = $(abspath $(SYSCONFDIR)/$(CONFIG_FILE_FC))
     SYSCONFIG_PATHS += $(SYSCONFIG_FC)
     CONFIGS += $(CONFIG_FC)
-    # dragonball-specific options (all should be suffixed by "_DB")
-##    DEFMAXVCPUS_FC := 1
-##    DEFBLOCKSTORAGEDRIVER_DB := virtio-blk-mmio
-##    DEFNETWORKMODEL_DB := tcfilter
-##    KERNELPARAMS = console=ttyS1 agent.log_vport=1025
-##	KERNELTYPE_DB = uncompressed
-##    KERNEL_NAME_DB = $(call MAKE_KERNEL_NAME_DB,$(KERNELTYPE_DB))
-##    KERNELPATH_DB = $(KERNELDIR)/$(KERNEL_NAME_DB)
-##    DEFSANDBOXCGROUPONLY = true
-##    RUNTIMENAME := virt_container
-##    PIPESIZE := 1
-##	DBSHAREDFS := inline-virtio-fs
 endif
 
-##CHANGE: db to fc
+ifeq ($(DEFAULT_HYPERVISOR),$(HYPERVISOR_DB))
+    DEFAULT_HYPERVISOR_CONFIG = $(CONFIG_FILE_DB)
+endif
+
 ifeq ($(DEFAULT_HYPERVISOR),$(HYPERVISOR_FC))
     DEFAULT_HYPERVISOR_CONFIG = $(CONFIG_FILE_FC)
 endif
@@ -357,6 +371,7 @@ RUNTIME_VERSION=$(VERSION)
 ## CHANGE :DB to fc
 GENERATED_VARS = \
 		VERSION \
+		CONFIG_DB_IN \
 		CONFIG_FC_IN \
 		$(USER_VARS)
 
