@@ -1,7 +1,9 @@
 use super::FcInner;
 use crate::device_type::DeviceConfig;
 use crate::VmmState;
-use anyhow::Result;
+use anyhow::{anyhow, Context, Result};
+
+
 
 impl FcInner {
     pub(crate) async fn add_device(&mut self, device: DeviceConfig) -> Result<()> {
@@ -13,14 +15,31 @@ impl FcInner {
             return Ok(());
         }
 
-        self.handle_device(device).await?;
+        info!(sl!(), "FcInner: Add Device {} ", device);
+
+        match device{
+            DeviceConfig::VirtioBlk(config) => self
+                .hotplug_block_device(
+                    config.path_on_host.as_str(),
+                    config.id.as_str(),
+                    config.is_readonly,
+                    config.no_drop,
+                ).await,
+            _ => Err(anyhow!("unhandled device: {:?}", device)),
+        };
 
         Ok(())
     }
-
-    async fn handle_device(&mut self, device: DeviceConfig) -> Result<()> {
-        info!(sl!(), "FcInner: Handle Device {} ", device);
-        todo!()
+    
+    pub(crate) async fn hotplug_block_device(
+        &mut self,
+        path: &str,
+        id: &str,
+        read_only: bool,
+        no_drop: bool,
+    ) -> Result<()> {
+        self.patch_container_rootfs("drive1",path).await?;;
+        Ok(())
     }
 
     pub(crate) async fn remove_device(&mut self, device: DeviceConfig) -> Result<()> {

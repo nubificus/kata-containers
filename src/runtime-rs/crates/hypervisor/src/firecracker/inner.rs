@@ -185,7 +185,7 @@ impl FcInner {
 
         Ok(())
     }
-    pub(crate) async fn _patch_container_rootfs(
+    pub(crate) async fn patch_container_rootfs(
         &mut self,
         drive_name: &str,
         c_rootfs: &str,
