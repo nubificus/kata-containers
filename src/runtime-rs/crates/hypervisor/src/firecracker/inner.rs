@@ -4,7 +4,10 @@ use std::{io::ErrorKind, path::Path};
 
 use crate::HypervisorState;
 
-use crate::{device_type::DeviceConfig, VmmState};
+use crate::{
+    device_type::{DeviceConfig, NetworkConfig},
+    VmmState,
+};
 use kata_types::{
     capabilities::{Capabilities, CapabilityBits},
     config::hypervisor::Hypervisor as HypervisorConfig,
@@ -20,6 +23,8 @@ use serde_json::json;
 use tokio::{fs, fs::File, process::Command};
 
 use crate::firecracker::utils::{get_api_socket_path, get_sandbox_path, get_vsock_path};
+
+use dbs_utils::net::MacAddr;
 
 const DISK_POOL_SIZE: u32 = 9;
 
@@ -198,6 +203,24 @@ impl FcInner {
         .to_string();
         while !Path::new(&self.asock_path).exists() {}
         self.patch(&["/drives/", drive_name].concat(), body).await?;
+        Ok(())
+    }
+
+    pub(crate) async fn add_net_device(&mut self, config: &NetworkConfig) -> Result<()> {
+        let g_mac = match &config.guest_mac {
+            Some(mac) => MacAddr::from_bytes(&mac.0).ok(),
+            None => None,
+        };
+        let body: String = json!({
+            "iface_id": &config.id,
+            "guest_mac": g_mac,
+            "host_dev_name": &config.host_dev_name
+
+        })
+        .to_string();
+        while !Path::new(&self.asock_path).exists() {}
+        self.put(&["/network-interfaces/", &config.id].concat(), body)
+            .await?;
         Ok(())
     }
 
