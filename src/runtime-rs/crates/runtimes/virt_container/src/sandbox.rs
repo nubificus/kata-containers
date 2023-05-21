@@ -424,7 +424,20 @@ impl Persist for VirtSandbox {
             resource: Some(self.resource_manager.save().await?),
             hypervisor: Some(self.hypervisor.save_state().await?),
         };
-        persist::to_disk(&sandbox_state, &self.sid)?;
+
+        let h = sandbox_state.hypervisor.clone().unwrap_or_default();
+        let hypervisor_name = h.hypervisor_type.as_str();
+
+        if !(hypervisor_name == "firecracker") || h.jailed == false {
+            persist::to_disk(&sandbox_state, &self.sid)?;
+        } else {
+            persist::to_disk(
+                &sandbox_state,
+                ["firecracker".to_string(), self.sid.clone()]
+                    .join("/")
+                    .as_str(),
+            )?;
+        }
         Ok(sandbox_state)
     }
     /// Restore Sandbox
