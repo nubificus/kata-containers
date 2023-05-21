@@ -94,6 +94,10 @@ impl VirtSandbox {
         network_env: SandboxNetworkEnv,
     ) -> Result<Vec<ResourceConfig>> {
         let mut resource_configs = vec![];
+        info!(
+            sl!(),
+            "created? {:?}, netns: {:?}", network_env.network_created, network_env.netns
+        );
         if !network_env.network_created {
             if let Some(netns_path) = network_env.netns {
                 let network_config = ResourceConfig::Network(
@@ -190,6 +194,7 @@ impl Sandbox for VirtSandbox {
             return Ok(());
         }
 
+        info!(sl!(), "prepare VM: {:?} {:?}", id, network_env.netns);
         self.hypervisor
             .prepare_vm(id, network_env.netns.clone())
             .await
@@ -204,10 +209,6 @@ impl Sandbox for VirtSandbox {
             .prepare_before_start_vm(resources)
             .await
             .context("set up device before start vm")?;
-
-        // start vm
-        self.hypervisor.start_vm(10_000).await.context("start vm")?;
-        info!(sl!(), "start vm");
 
         // execute pre-start hook functions, including Prestart Hooks and CreateRuntime Hooks
         let (prestart_hooks, create_runtime_hooks) = match spec.hooks.as_ref() {
@@ -239,6 +240,10 @@ impl Sandbox for VirtSandbox {
                     .context("set up device after start vm")?;
             }
         }
+
+        // start vm
+        self.hypervisor.start_vm(10_000).await.context("start vm")?;
+        info!(sl!(), "start vm");
 
         // connect agent
         // set agent socket
@@ -424,7 +429,17 @@ impl Persist for VirtSandbox {
             resource: Some(self.resource_manager.save().await?),
             hypervisor: Some(self.hypervisor.save_state().await?),
         };
-        persist::to_disk(&sandbox_state, &self.sid)?;
+        let jailer_root = self.hypervisor.get_jailer_root().await?;
+        if jailer_root.is_empty() {
+            persist::to_disk(&sandbox_state, &self.sid)?;
+        } else {
+            persist::to_disk(
+                &sandbox_state,
+                ["firecracker".to_string(), self.sid.clone()]
+                    .join("/")
+                    .as_str(),
+            )?;
+        }
         Ok(sandbox_state)
     }
     /// Restore Sandbox
