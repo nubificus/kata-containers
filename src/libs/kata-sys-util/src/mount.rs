@@ -191,12 +191,24 @@ pub fn create_mount_destination<S: AsRef<Path>, D: AsRef<Path>, R: AsRef<Path>>(
 
     if fs_type == "bind" {
         // The source and destination for bind mounting must be the same type: file or directory.
+        info!(
+            sl!(),
+            "bound file: {:?}, {:?}",
+            src.as_ref().to_path_buf().file_name(),
+            dst.to_path_buf().file_name()
+        );
         if !src.as_ref().is_dir() {
             fs::OpenOptions::new()
                 .mode(MOUNT_PERM)
                 .write(true)
                 .create(true)
                 .open(dst)?;
+            info!(
+                sl!(),
+                "bound file: {:?}, {:?}",
+                src.as_ref().to_path_buf().file_name(),
+                dst.to_path_buf().file_name()
+            );
             return Ok(dst.to_path_buf());
         }
     }
