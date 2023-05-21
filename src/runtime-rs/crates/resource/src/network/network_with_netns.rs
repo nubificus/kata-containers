@@ -178,6 +178,7 @@ async fn get_entity_from_netns(config: &NetworkWithNetNsConfig) -> Result<Vec<Ne
         }
 
         let idx = idx.fetch_add(1, Ordering::Relaxed);
+        info!(sl!(), "config: {:?} {:?}", idx, config);
         let (endpoint, network_info) = create_endpoint(&handle, link.as_ref(), idx, config)
             .await
             .context("create endpoint")?;
@@ -216,6 +217,10 @@ async fn create_endpoint(
         );
         match link_type {
             "veth" => {
+                info!(
+                    sl!(),
+                    "In VETH, found correct endpoint: {:?} {:?}", idx, &attrs.name
+                );
                 let ret = VethEndpoint::new(
                     handle,
                     &attrs.name,
@@ -267,6 +272,7 @@ async fn create_endpoint(
 }
 
 fn is_physical_iface(name: &str) -> Result<bool> {
+    info!(sl!(), "in is_physical!!: {:?}", name);
     if name == "lo" {
         return Ok(false);
     }
