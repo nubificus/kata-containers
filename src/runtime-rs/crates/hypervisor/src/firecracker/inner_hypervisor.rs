@@ -5,7 +5,7 @@ use crate::VmmState;
 
 use kata_types::capabilities::Capabilities;
 
-use crate::firecracker::utils::get_vsock_path;
+use crate::firecracker::utils::{get_sandbox_path, get_vsock_path};
 
 use crate::firecracker::FcInner;
 
@@ -30,6 +30,20 @@ impl FcInner {
     }
 
     pub(crate) async fn stop_vm(&mut self) -> Result<()> {
+        info!(sl!(), "Stopping Firecracker");
+        if self.state != VmmState::VmRunning {
+            info!(sl!(), "Cannot stop Firecracker as it is not running!");
+        } else if let Some(pid_to_kill) = &self.pid {
+            let pid = ::nix::unistd::Pid::from_raw(*pid_to_kill as i32);
+            if let Err(err) = ::nix::sys::signal::kill(pid, nix::sys::signal::SIGKILL) {
+                if err != ::nix::Error::ESRCH {
+                    info!(
+                        sl!(),
+                        "failed to kill Firecracker with pid {} {:?}", pid, err
+                    );
+                }
+            }
+        }
         Ok(())
     }
 
@@ -88,7 +102,14 @@ impl FcInner {
 
     pub(crate) async fn cleanup(&self) -> Result<()> {
         info!(sl!(), "FcInner: Cleanup");
-        todo!()
+        let sb_path = get_sandbox_path(&self.id)?;
+        std::fs::remove_dir_all(&sb_path)
+            .map_err(|err| {
+                error!(sl!(), "failed to remove dir all for {}", &sb_path);
+                err
+            })
+            .ok();
+        Ok(())
     }
 
     pub(crate) async fn check(&self) -> Result<()> {
