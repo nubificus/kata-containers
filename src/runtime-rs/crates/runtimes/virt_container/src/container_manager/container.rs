@@ -21,6 +21,7 @@ use kata_sys_util::k8s::update_ephemeral_storage_type;
 use oci::{LinuxResources, Process as OCIProcess};
 use resource::ResourceManager;
 use tokio::sync::RwLock;
+use tokio::time::Duration;
 
 use super::{
     process::{Process, ProcessWatcher},
@@ -83,6 +84,9 @@ impl Container {
 
     pub async fn create(&self, mut spec: oci::Spec) -> Result<()> {
         // process oci spec
+
+        tokio::time::sleep(Duration::from_secs(20)).await;
+
         let mut inner = self.inner.write().await;
         let toml_config = self.resource_manager.config().await;
         let config = &self.config;

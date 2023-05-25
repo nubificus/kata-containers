@@ -1,4 +1,4 @@
-use anyhow::{anyhow, Result};
+use anyhow::{anyhow, Context, Result};
 
 use crate::VcpuThreadIds;
 use crate::VmmState;
@@ -8,12 +8,28 @@ use kata_types::capabilities::Capabilities;
 use crate::firecracker::utils::{get_sandbox_path, get_vsock_path};
 
 use crate::firecracker::FcInner;
+use tokio::fs;
 
 impl FcInner {
     pub(crate) async fn prepare_vm(&mut self, id: &str, _netns: Option<String>) -> Result<()> {
         info!(sl!(), "Preparing Firecracker");
 
+        let sb_path = get_sandbox_path(id)?;
+        //let j_path = [&sb_path, "firecracker", id, "root"].join("/");
+
+        let _ = fs::create_dir_all(&sb_path)
+            .await
+            .context(format!("failed to create directory {:?}", &sb_path));
+
         self.id = id.to_string();
+
+        if !self.config.jailer_path.is_empty() {
+            info!(sl!(), "JAILER ENCOUNTERED");
+            self.jailed = true;
+            self.jailer_root = sb_path;
+            let _ = self.remount_jailer_with_exec();
+        }
+
         self.prepare_api_socket(id).await?;
         self.prepare_vmm().await?;
         self.state = VmmState::VmmServerReady;
@@ -64,7 +80,7 @@ impl FcInner {
     pub(crate) async fn get_agent_socket(&self) -> Result<String> {
         const HYBRID_VSOCK_SCHEME: &str = "hvsock";
         info!(sl!(), "FcInner: Get agent socket");
-        let vsock_path = get_vsock_path(&self.id)?;
+        let vsock_path = get_vsock_path(&self.id, self.jailed, false)?;
         Ok(format!("{}://{}", HYBRID_VSOCK_SCHEME, vsock_path))
     }
 
@@ -103,23 +119,18 @@ impl FcInner {
     pub(crate) async fn cleanup(&self) -> Result<()> {
         info!(sl!(), "FcInner: Cleanup");
         let sb_path = get_sandbox_path(&self.id)?;
-        std::fs::remove_dir_all(&sb_path)
-            .map_err(|err| {
-                error!(sl!(), "failed to remove dir all for {}", &sb_path);
-                err
-            })
-            .ok();
+        self.cleanup_resource(&sb_path);
         Ok(())
     }
 
     pub(crate) async fn check(&self) -> Result<()> {
         info!(sl!(), "FcInner: Check");
-        todo!()
+        Ok(())
     }
 
     pub(crate) async fn get_jailer_root(&self) -> Result<String> {
         info!(sl!(), "FcInner: Get jailerroot");
-        todo!()
+        Ok(self.jailer_root.clone())
     }
     pub(crate) async fn capabilities(&self) -> Result<Capabilities> {
         Ok(self.capabilities.clone())

@@ -1,4 +1,4 @@
-use anyhow::{Context, Result};
+use anyhow::{anyhow, Context, Result};
 
 use std::{io::ErrorKind, path::Path};
 
@@ -22,25 +22,28 @@ use persist::sandbox_persist::Persist;
 use serde_json::json;
 use tokio::{fs, fs::File, process::Command};
 
-use crate::firecracker::utils::{get_api_socket_path, get_sandbox_path, get_vsock_path};
+use crate::firecracker::utils::*;
 
 use dbs_utils::net::MacAddr;
+use kata_sys_util::mount;
 
 const DISK_POOL_SIZE: u32 = 9;
+const FC_KERNEL: &str = "vmlinux";
+const FC_ROOT_FS: &str = "rootfs";
+const C_ROOTFS: &str = "container_rootfs";
 
 unsafe impl Send for FcInner {}
 unsafe impl Sync for FcInner {}
 
 pub struct FcInner {
     pub(crate) id: String,
-    //pub(crate) fc_path: String,
     pub(crate) asock_path: String,
     pub(crate) state: VmmState,
     pub(crate) config: HypervisorConfig,
     pub(crate) pid: Option<u32>,
-    //pub(crate) config_json: ,
     pub(crate) client: Client<UnixConnector>,
-    //pub(crate) has_conf: bool,
+    pub(crate) jailer_root: String,
+    pub(crate) jailed: bool,
     pub(crate) pending_devices: Vec<DeviceConfig>,
     pub(crate) capabilities: Capabilities,
 }
@@ -55,18 +58,43 @@ impl FcInner {
             state: VmmState::NotReady,
             config: Default::default(),
             pid: None,
-            //config_json: Path::new("").into(),
             client: Client::unix(),
-            //has_conf: false,
+            jailer_root: String::default(),
+            jailed: false,
             pending_devices: vec![],
             capabilities,
         }
     }
 
     pub(crate) async fn prepare_vmm(&mut self) -> Result<()> {
-        let mut cmd = Command::new(&self.config.path);
+        let mut cmd: Command;
+        match !self.jailed {
+            true => {
+                cmd = Command::new(&self.config.path);
+                cmd.args(["--api-sock", &self.asock_path]);
+            }
+            false => {
+                info!(sl!(), "Firecracker JAILED");
+                cmd = Command::new(&self.config.jailer_path);
+                cmd.args([
+                    "--id",
+                    &self.id,
+                    "--gid",
+                    "0",
+                    "--uid",
+                    "0",
+                    "--exec-file",
+                    &self.config.path,
+                    "--chroot-base-dir",
+                    &self.jailer_root,
+                    "--daemonize",
+                ]);
+            }
+        }
+
         info!(sl!(), "Firecracker PATH: {:?}", &self.config.path);
-        cmd.args(["--api-sock", &self.asock_path]);
+        info!(sl!(), "Firecracker JAILER: {:?}", &self.config.jailer_path);
+        info!(sl!(), "Firecracker JAILER ROOT: {:?}", &self.jailer_root);
         let mut child = cmd.spawn()?;
         match child.id() {
             Some(id) => {
@@ -84,15 +112,57 @@ impl FcInner {
         Ok(())
     }
 
+    pub(crate) fn get_resource(&self, src: &str, dst: &str) -> Result<String> {
+        if self.jailed {
+            self.jail_resource(src, dst)
+        } else {
+            Ok(src.to_string())
+        }
+    }
+
+    fn jail_resource(&self, src: &str, dst: &str) -> Result<String> {
+        info!(sl!(), "jail resource: src {} dst {}", src, dst);
+        if src.is_empty() || dst.is_empty() {
+            return Err(anyhow!("invalid param src {} dst {}", src, dst));
+        }
+
+        let jailed_location = [
+            self.jailer_root.as_str(),
+            "firecracker",
+            &self.id,
+            "root",
+            dst,
+        ]
+        .join("/");
+        mount::bind_mount_unchecked(src, jailed_location.as_str(), false)
+            .context("bind_mount ERROR")?;
+
+        let mut abs_path = String::from("/");
+        abs_path.push_str(dst);
+        Ok(abs_path)
+    }
+
+    pub(crate) fn remount_jailer_with_exec(&self) -> Result<()> {
+        info!(
+            sl!(),
+            "FCInner: bind mount jailer_root: {:?}",
+            self.jailer_root.as_str()
+        );
+        mount::bind_mount_unchecked(self.jailer_root.as_str(), self.jailer_root.as_str(), false)
+            .context("bind mount jailer root")?;
+
+        info!(
+            sl!(),
+            "FCInner: REbind mount jailer_root: {:?}",
+            self.jailer_root.as_str()
+        );
+        mount::bind_remount(self.jailer_root.as_str(), false)
+            .context("rebind mount jailer root")?;
+        Ok(())
+    }
+
     pub(crate) async fn prepare_api_socket(&mut self, id: &str) -> Result<()> {
-        let sb_path = get_sandbox_path(id)?;
-        let r_path = [&sb_path, "root"].join("/");
-
-        let _ = fs::create_dir_all(&r_path)
-            .await
-            .context(format!("failed to create directory {:?}", &sb_path));
-
-        self.asock_path = get_api_socket_path(id)?;
+        self.asock_path = get_api_socket_path(id, self.jailed, false)?;
 
         match fs::remove_file(&self.asock_path).await {
             Ok(_) => info!(
@@ -115,9 +185,11 @@ impl FcInner {
 
     pub(crate) async fn prepare_hvsock(&mut self, id: &str) -> Result<()> {
         info!(sl!(), "PREPARING VSOCK");
-        let uds_path = get_vsock_path(id)?;
+        let uds_path = get_vsock_path(id, self.jailed, false)?;
+        let rel_uds_path = get_vsock_path(id, self.jailed, true)?;
 
         info!(sl!(), "UDS: {}", &uds_path);
+        info!(sl!(), "UDS REL: {}", &rel_uds_path);
         match fs::remove_file(&uds_path).await {
             Ok(_) => info!(sl!(), "Deleted HybridV socket {:?}", &uds_path),
             Err(e) if e.kind() == ErrorKind::NotFound => {
@@ -130,7 +202,7 @@ impl FcInner {
         }
         let body_vsock: String = json!({
             "guest_cid": 3,
-            "uds_path": uds_path,
+            "uds_path": rel_uds_path,
             "vsock_id": "root"
         })
         .to_string();
@@ -141,37 +213,53 @@ impl FcInner {
     }
 
     pub(crate) async fn prepare_vmm_resources(&mut self, id: &str) -> Result<()> {
+        let kernel = self
+            .get_resource(&self.config.boot_info.kernel, FC_KERNEL)
+            .context("get resource KERNEL")?;
+        let rootfs = self
+            .get_resource(&self.config.boot_info.image, FC_ROOT_FS)
+            .context("get resource ROOTFS")?;
+
         let body_kernel: String = json!({
-            "kernel_image_path": &self.config.boot_info.kernel,
+            "kernel_image_path": kernel,
             "boot_args": &self.config.boot_info.kernel_params
         })
         .to_string();
 
         let body_rootfs: String = json!({
               "drive_id": "rootfs",
-              "path_on_host": &self.config.boot_info.image,
+              "path_on_host": rootfs,
               "is_root_device": false,
               "is_read_only": true
         })
         .to_string();
 
+        info!(sl!(), "ASOCK_PATH: {}", &self.asock_path);
+
         //FIXME busywait
-        // similar to
-        // https://github.com/kata-containers/kata-containers/blob/109071855df8d73af9bb089c2a4a1d9006c08bb3/src/runtime-rs/crates/hypervisor/src/ch/inner_hypervisor.rs#L163
+        //let _ = wait_api_socket(&self.asock_path);
         while !Path::new(&self.asock_path).exists() {}
 
         self.put("/boot-source", body_kernel).await?;
         self.put("/drives/rootfs", body_rootfs).await?;
 
         let sb_path = get_sandbox_path(id)?;
-        let r_path = [&sb_path, "rootfs"].join("/");
+        let abs_dummy_path = match self.jailed {
+            false => [&sb_path, "root", "dummies"].join("/"),
+            true => [&sb_path, "firecracker", id, "root", "dummies"].join("/"),
+        };
 
-        let _ = fs::create_dir_all(&r_path)
+        let rel_dummy_path = match self.jailed {
+            false => abs_dummy_path.clone(),
+            true => "dummies".to_string(),
+            //["root", "dummies"].join("/"),
+        };
+        let _ = fs::create_dir_all(&abs_dummy_path)
             .await
-            .context(format!("failed to create directory {:?}", &r_path));
+            .context(format!("failed to create directory {:?}", &abs_dummy_path));
 
         for i in 1..DISK_POOL_SIZE {
-            let full_path_name = format!("{}/drive{}.ext4", r_path, i);
+            let full_path_name = format!("{}/drive{}.ext4", abs_dummy_path, i);
 
             let _ = File::create(&full_path_name)
                 .await
@@ -179,7 +267,7 @@ impl FcInner {
 
             let body_dummy: String = json!({
                 "drive_id": format!("drive{}",i),
-                "path_on_host": full_path_name,
+                "path_on_host": format!("{}/drive{}.ext4", rel_dummy_path, i),
                 "is_root_device": false,
                 "is_read_only": false
             })
@@ -195,12 +283,17 @@ impl FcInner {
         drive_name: &str,
         c_rootfs: &str,
     ) -> Result<()> {
+        let new_c_rootfs = self
+            .get_resource(&c_rootfs, C_ROOTFS)
+            .context("get resource CONTAINER ROOTFS")?;
+
         let body: String = json!({
-              "drive_id": drive_name,
-              "path_on_host": c_rootfs
+            "drive_id": drive_name,
+            "path_on_host": new_c_rootfs
 
         })
         .to_string();
+        info!(sl!(), "PATCH BODY {:?}", &body);
         while !Path::new(&self.asock_path).exists() {}
         self.patch(&["/drives/", drive_name].concat(), body).await?;
         Ok(())
@@ -243,6 +336,8 @@ impl FcInner {
             .header("Accept", "application/json")
             .header("Content-Type", "application/json")
             .body(Body::from(data))?;
+        info!(sl!(), "PATCH URL {:?}", &url);
+        info!(sl!(), "PATCH REQ {:?}", &req);
         self.send_request(req).await
     }
 
@@ -287,6 +382,29 @@ impl FcInner {
         Ok(())
     }
 
+    pub(crate) fn cleanup_resource(&self, sb_path: &String) {
+        if self.jailed {
+            self.umount_jail_resource(FC_KERNEL).ok();
+            self.umount_jail_resource(FC_ROOT_FS).ok();
+//            for id in &self.cached_block_devices {
+//                self.umount_jail_resource(id.as_str()).ok();
+//            }
+        }
+//        std::fs::remove_dir_all(sb_path)
+//            .map_err(|err| {
+//                error!(sl!(), "failed to remove dir all for {}", &sb_path);
+//                err
+//            })
+//            .ok();
+    }
+
+    pub(crate) fn umount_jail_resource(&self, jailed_path: &str) -> Result<()> {
+        let path = [self.jailer_root.as_str(), jailed_path].join("/");
+        info!(sl!(), "FcInner: UNMOUNT JAIL RESOURCE");
+        nix::mount::umount2(path.as_str(), nix::mount::MntFlags::MNT_DETACH)
+            .with_context(|| format!("umount path {}", &path))
+    }
+
     pub(crate) fn hypervisor_config(&self) -> HypervisorConfig {
         info!(sl!(), "FcInner: Hypervisor config");
         self.config.clone()
@@ -306,12 +424,10 @@ impl Persist for FcInner {
         Ok(HypervisorState {
             hypervisor_type: HYPERVISOR_FIRECRACKER.to_string(),
             id: self.id.clone(),
-            //make sure this is correct
             vm_path: self.config.path.clone(),
             config: self.hypervisor_config(),
-            //will change when jail is implemented
-            jailed: false,
-            jailer_root: String::default(),
+            jailed: self.jailed,
+            jailer_root: self.jailer_root.clone(),
             netns: None,
             ..Default::default()
         })
@@ -326,11 +442,10 @@ impl Persist for FcInner {
             state: VmmState::NotReady,
             config: hypervisor_state.config,
             pid: None,
-            //config_json: Path::new("").into(),
+            jailed: hypervisor_state.jailed,
+            jailer_root: hypervisor_state.jailer_root,
             client: Client::unix(),
-            //has_conf: false,
             pending_devices: vec![],
-            //make sure this is correct down the line
             capabilities: Capabilities::new(),
         })
     }

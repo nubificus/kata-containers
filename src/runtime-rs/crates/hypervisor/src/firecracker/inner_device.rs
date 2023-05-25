@@ -17,6 +17,7 @@ impl FcInner {
 
         let _ = match device {
             DeviceConfig::VirtioBlk(config) => {
+                info!(sl!(), "ADD DEV BLOCK");
                 self.hotplug_block_device(
                     config.path_on_host.as_str(),
                     config.id.as_str(),
