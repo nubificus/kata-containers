@@ -10,6 +10,11 @@ use crate::{network::NetworkConfig, resource_persist::ResourceState};
 use agent::{types::Device, Agent, Storage};
 use anyhow::{anyhow, Context, Ok, Result};
 use async_trait::async_trait;
+
+use std::fs::File;
+use std::io::Read;
+use std::os::unix::fs::MetadataExt;
+
 use hypervisor::{
     device::{device_manager::DeviceManager, DeviceConfig},
     BlockConfig, Hypervisor,
@@ -26,7 +31,7 @@ use crate::{
     network::{self, Network},
     rootfs::{RootFsResource, Rootfs},
     share_fs::{self, ShareFs},
-    volume::{Volume, VolumeResource},
+    volume::{share_fs_volume, Volume, VolumeResource},
     ResourceConfig,
 };
 
@@ -73,6 +78,14 @@ impl ResourceManagerInner {
 
     pub fn config(&self) -> Arc<TomlConfig> {
         self.toml_config.clone()
+    }
+
+    pub async fn get_sf_capability(&self) -> Result<bool> {
+        Ok(self
+            .hypervisor
+            .capabilities()
+            .await?
+            .is_fs_sharing_supported())
     }
 
     pub fn get_device_manager(&self) -> Arc<RwLock<DeviceManager>> {
@@ -142,6 +155,45 @@ impl ResourceManagerInner {
         .context("Couldn't join on the associated thread")?
         .context("failed to set up network")?;
         self.network = Some(network);
+        Ok(())
+    }
+
+    pub async fn handle_sharefsfiles(
+        &self,
+        share_fs_file: &mut share_fs_volume::ShareFsFile,
+    ) -> Result<()> {
+        info!(sl!(), "handle sharefsfiles {:?}", share_fs_file.src_file);
+        let src = std::fs::metadata(share_fs_file.src.clone());
+        let cloned_src = src?.clone();
+
+        let mut file = File::open(&share_fs_file.src)
+            .with_context(|| format!("Failed to open file: {:?}", share_fs_file.src))?;
+
+        let mut buffer = Vec::new();
+        file.read_to_end(&mut buffer)
+            .with_context(|| format!("Failed to read file: {:?}", share_fs_file.src))?;
+
+        let dest = [
+            "/run/kata-containers/shared/containers/passthrough",
+            &share_fs_file.src_file,
+        ]
+        .join("/");
+        let r = agent::CopyFileRequest {
+            path: dest.clone(),
+            file_size: cloned_src.len() as i64,
+            uid: cloned_src.uid() as i32,
+            gid: cloned_src.gid() as i32,
+            file_mode: cloned_src.mode(),
+            data: buffer,
+            ..Default::default()
+        };
+
+        self.agent
+            .copy_file(r)
+            .await
+            .context("copy file request failed")?;
+
+        share_fs_file.dest = dest;
         Ok(())
     }
 
@@ -242,6 +294,18 @@ impl ResourceManagerInner {
         cid: &str,
         spec: &oci::Spec,
     ) -> Result<Vec<Arc<dyn Volume>>> {
+        let oci_mounts = &spec.mounts;
+        info!(sl!(), " oci mount is : {:?}", oci_mounts.clone());
+        // handle mounts
+//        for m in oci_mounts {
+//            //info!(sl!(), " m: {:?}", m.source);
+//            if share_fs_volume::is_share_fs_file(m) {
+//                let mysharefs = share_fs_volume::ShareFsFile::new(m.source.clone());
+//                //self.handle_sharefsfiles(&mut mysharefs.await?).await?;
+//                //m.destination = mysharefs.await.unwrap().dest;
+//            };
+//        }
+
         self.volume_resource
             .handler_volumes(
                 &self.share_fs,

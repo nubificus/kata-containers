@@ -7,7 +7,7 @@
 mod block_volume;
 mod default_volume;
 pub mod hugepage;
-mod share_fs_volume;
+pub mod share_fs_volume;
 mod shm_volume;
 use async_trait::async_trait;
 
@@ -82,6 +82,12 @@ impl VolumeResource {
                 Arc::new(
                     hugepage::Hugepage::new(m, hugepage_limits, options)
                         .with_context(|| format!("handle hugepages {:?}", m))?,
+                )
+            } else if share_fs_volume::is_share_fs_file(m) {
+                Arc::new(
+                    share_fs_volume::ShareFsFile::new(m.source.clone())
+                        .await
+                        .with_context(|| format!("new share fs volume {:?}", m))?,
                 )
             } else if share_fs_volume::is_share_fs_volume(m) {
                 Arc::new(

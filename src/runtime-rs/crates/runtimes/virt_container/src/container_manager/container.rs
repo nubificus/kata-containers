@@ -28,6 +28,8 @@ use super::{
 };
 use crate::container_manager::logger_with_process;
 
+use resource::volume::share_fs_volume;
+
 pub struct Exec {
     pub(crate) process: Process,
     pub(crate) oci_process: OCIProcess,
@@ -86,9 +88,12 @@ impl Container {
         let mut inner = self.inner.write().await;
         let toml_config = self.resource_manager.config().await;
         let config = &self.config;
+        info!(sl!(), "CONT TOML: {:?}", &toml_config);
+        info!(sl!(), "CONT CONF: {:?}", &config);
         let sandbox_pidns = is_pid_namespace_enabled(&spec);
         amend_spec(&mut spec, toml_config.runtime.disable_guest_seccomp).context("amend spec")?;
 
+        info!(sl!(), "CONT SPEC: {:?}", &spec);
         // get mutable root from oci spec
         let mut root = match spec.root.as_mut() {
             Some(root) => root,
@@ -125,6 +130,28 @@ impl Container {
             .handler_volumes(&config.container_id, &spec)
             .await
             .context("handler volumes")?;
+
+        let mut oci_mounts_etc = vec![];
+
+        if !self.resource_manager.get_sf_capability().await? {
+            info!(sl!(), "HI");
+            for mut m in spec.mounts.iter_mut() {
+                info!(sl!(), "TI SKATA EIMAI: {:?}", &m);
+                if share_fs_volume::is_share_fs_file(m) {
+                    info!(sl!(), "LIGO AKOMA");
+                    info!(sl!(), " MOUNT BEFORE: {:?}", m);
+                    let mut mysharefs = share_fs_volume::ShareFsFile::new(m.source.clone()).await?;
+                    self.resource_manager
+                        .handle_sharefsfiles(&mut mysharefs)
+                        .await?;
+                    m.source = mysharefs.get_dest().await;
+                    oci_mounts_etc.push(m.clone());
+                    info!(sl!(), " MOUNT AFTER: {:?}", m);
+                }
+            }
+        }
+        info!(sl!(), "OCI MOUNT ETC BEFORE: {:?}", &oci_mounts_etc);
+
         let mut oci_mounts = vec![];
         for v in volumes {
             let mut volume_mounts = v.get_volume_mount().context("get volume mount")?;
@@ -138,6 +165,9 @@ impl Container {
             }
             inner.volumes.push(v);
         }
+        info!(sl!(), "OCI MOUNT BEFORE: {:?}", &oci_mounts);
+        oci_mounts.append(&mut oci_mounts_etc);
+        info!(sl!(), "OCI MOUNT AFTER: {:?}", &oci_mounts);
         spec.mounts = oci_mounts;
 
         let linux = spec

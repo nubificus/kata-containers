@@ -4,11 +4,7 @@ use std::{io::ErrorKind, path::Path};
 
 use crate::HypervisorState;
 
-use crate::{
-    device::DeviceType,NetworkConfig,
-    VmmState,
-    kernel_param::KernelParams,
-};
+use crate::{device::DeviceType, kernel_param::KernelParams, NetworkConfig, VmmState};
 use kata_types::{
     capabilities::{Capabilities, CapabilityBits},
     config::hypervisor::Hypervisor as HypervisorConfig,
@@ -24,7 +20,7 @@ use serde_json::json;
 
 use tokio::{fs, fs::File, process::Command};
 //use std::os::unix::{io::AsRawFd, process::CommandExt};
-use std::{os::unix::io::AsRawFd};
+use std::os::unix::io::AsRawFd;
 
 use crate::firecracker::utils::{get_api_socket_path, get_sandbox_path, get_vsock_path};
 
@@ -61,7 +57,7 @@ impl FcInner {
             asock_path: String::default(),
             state: VmmState::NotReady,
             config: Default::default(),
-            pid: None, 
+            pid: None,
             netns: None,
             //config_json: Path::new("").into(),
             client: Client::unix(),
@@ -75,24 +71,29 @@ impl FcInner {
         let mut cmd = Command::new(&self.config.path);
         info!(sl!(), "Firecracker PATH: {:?}", &self.config.path);
         cmd.args(["--api-sock", &self.asock_path]);
-        
+
         unsafe {
-            let _pre = cmd.pre_exec(move || { if let Some(netns_path) = &netns {
-                            info!(sl!(), "set netns for vmm master {:?}", &netns_path);
-                            //let netns_fd = File::Open(&netns_path)
-                            let netns_fd = std::fs::File::open(&netns_path);
-                            setns(netns_fd?.as_raw_fd(), CloneFlags::CLONE_NEWNET)
-                                .context("set netns ");
-                            } Ok(()) });
+            let _pre = cmd.pre_exec(move || {
+                if let Some(netns_path) = &netns {
+                    info!(sl!(), "set netns for vmm master {:?}", &netns_path);
+                    //let netns_fd = File::Open(&netns_path)
+                    let netns_fd = std::fs::File::open(netns_path);
+                    let _ = setns(netns_fd?.as_raw_fd(), CloneFlags::CLONE_NEWNET)
+                        .context("set netns ");
+                }
+                Ok(())
+            });
         }
 
         let mut child = cmd.spawn()?;
 
         match child.id() {
-       
             Some(id) => {
                 let cur_tid = nix::unistd::gettid().as_raw() as u32;
-                info!(sl!(), "Firecracker started successfully with id: {:?}, {:?}", id, cur_tid);
+                info!(
+                    sl!(),
+                    "Firecracker started successfully with id: {:?}, {:?}", id, cur_tid
+                );
                 self.pid = Some(id);
             }
             None => {
@@ -248,11 +249,16 @@ impl FcInner {
         .to_string();
         info!(sl!(), "start busy wait on patch rootfs");
         while !Path::new(&self.asock_path).exists() {}
-        self.patch(&["/drives/", &format!("drive{drive_name}")].concat(), body).await?;
+        self.patch(&["/drives/", &format!("drive{drive_name}")].concat(), body)
+            .await?;
         Ok(())
     }
 
-    pub(crate) async fn add_net_device(&mut self, config: &NetworkConfig, device_id: String) -> Result<()> {
+    pub(crate) async fn add_net_device(
+        &mut self,
+        config: &NetworkConfig,
+        device_id: String,
+    ) -> Result<()> {
         let g_mac = match &config.guest_mac {
             Some(mac) => MacAddr::from_bytes(&mac.0).ok(),
             None => None,

@@ -33,6 +33,42 @@ pub(crate) struct ShareFsVolume {
     storages: Vec<agent::Storage>,
 }
 
+pub struct ShareFsFile {
+    pub src_file: String,
+    pub src: PathBuf,
+    pub dest: String,
+}
+
+impl ShareFsFile {
+    pub async fn new(src_file: String) -> Result<Self> {
+        let file_name = Path::new(&src_file).file_name().unwrap().to_str().unwrap();
+        let file_name = generate_mount_path("sandbox", file_name);
+
+        let src = match std::fs::canonicalize(&src_file) {
+            Err(err) => {
+                return Err(anyhow!(format!(
+                    "failed to canonicalize file {} {:?}",
+                    src_file, err
+                )))
+            }
+            Ok(src) => src,
+        };
+
+        info!(sl!(), "src_file : {:?}", src_file);
+        //        let file_returned = ShareFsFile::new(file_name.clone());
+
+        info!(sl!(), "src_file : {:?}", file_name);
+        Ok(ShareFsFile {
+            src_file: file_name,
+            src,
+            dest: src_file,
+        })
+    }
+    pub async fn get_dest(&self) -> String {
+        self.dest.clone()
+    }
+}
+
 impl ShareFsVolume {
     pub(crate) async fn new(
         share_fs: &Option<Arc<dyn ShareFs>>,
@@ -64,6 +100,23 @@ impl ShareFsVolume {
                 if src.is_file() {
                     // TODO: copy file
                     debug!(sl!(), "FIXME: copy file {}", &m.source);
+                    /*let file_size = fs::metadata(src)?.len();
+
+                    let r = agent::CreateCopyFileRequest {
+                        Path: file_name,
+                        DirMode: None,
+                        FileMode: src?.st_mode(),
+                        FileSize: src?.len(),
+                        Uid: src?.st_uid(),
+                        Gid: src?.st_gid(),
+                        ..Default::default()
+                    };
+
+                    self.agent
+                        .copy_file(r)
+                        .await
+                        .context("agent create container")?;*/
+                    /*let file_returned = ShareFsFile::new(file_name, src);*/
                 } else {
                     debug!(
                         sl!(),
@@ -151,6 +204,24 @@ impl ShareFsVolume {
 }
 
 #[async_trait]
+impl Volume for ShareFsFile {
+    fn get_volume_mount(&self) -> anyhow::Result<Vec<oci::Mount>> {
+        Ok(vec![])
+    }
+
+    fn get_storage(&self) -> Result<Vec<agent::Storage>> {
+        Ok(vec![])
+    }
+
+    async fn cleanup(&self, _device_manager: &RwLock<DeviceManager>) -> Result<()> {
+        Ok(())
+    }
+    fn get_device_id(&self) -> Result<Option<String>> {
+        Ok(None)
+    }
+}
+
+#[async_trait]
 impl Volume for ShareFsVolume {
     fn get_volume_mount(&self) -> anyhow::Result<Vec<oci::Mount>> {
         Ok(self.mounts.clone())
@@ -233,10 +304,19 @@ impl Volume for ShareFsVolume {
     }
 }
 
+pub fn is_share_fs_file(m: &oci::Mount) -> bool {
+    is_file(&m.destination)
+}
+
 pub(crate) fn is_share_fs_volume(m: &oci::Mount) -> bool {
     (m.r#type == "bind" || m.r#type == mount::KATA_EPHEMERAL_VOLUME_TYPE)
         && !is_host_device(&m.destination)
         && !is_system_mount(&m.source)
+        && !is_file(&m.source)
+}
+
+fn is_file(dest: &str) -> bool {
+    matches!(dest, "/etc/resolv.conf" | "/etc/hostname" | "/etc/hosts")
 }
 
 fn is_host_device(dest: &str) -> bool {

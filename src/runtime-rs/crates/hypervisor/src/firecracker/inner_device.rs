@@ -16,19 +16,19 @@ impl FcInner {
         info!(sl!(), "FcInner: Add Device {} ", device);
 
         let _ = match device {
-            DeviceType::Block(block) => {
-                self.hotplug_block_device(
+            DeviceType::Block(block) => self
+                .hotplug_block_device(
                     block.config.path_on_host.as_str(),
                     block.config.index,
                     block.config.is_readonly,
                     block.config.no_drop,
                 )
                 .await
-                .context("add block device")
-            }
-            DeviceType::Network(network) => {
-                self.add_net_device(&network.config, network.id).await.context("add net device")
-            }
+                .context("add block device"),
+            DeviceType::Network(network) => self
+                .add_net_device(&network.config, network.id)
+                .await
+                .context("add net device"),
             _ => Err(anyhow!("unhandled device: {:?}", device)),
         };
 

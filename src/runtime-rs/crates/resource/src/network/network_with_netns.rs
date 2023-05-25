@@ -217,7 +217,10 @@ async fn create_endpoint(
         );
         match link_type {
             "veth" => {
-                info!(sl!(), "In VETH, found correct endpoint: {:?} {:?}", idx, &attrs.name);
+                info!(
+                    sl!(),
+                    "In VETH, found correct endpoint: {:?} {:?}", idx, &attrs.name
+                );
                 let ret = VethEndpoint::new(
                     handle,
                     &attrs.name,

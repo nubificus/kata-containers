@@ -6,7 +6,12 @@
 
 use crate::network::NetworkConfig;
 use crate::resource_persist::ResourceState;
-use crate::{manager_inner::ResourceManagerInner, rootfs::Rootfs, volume::Volume, ResourceConfig};
+use crate::{
+    manager_inner::ResourceManagerInner,
+    rootfs::Rootfs,
+    volume::{share_fs_volume, Volume},
+    ResourceConfig,
+};
 use agent::types::Device;
 use agent::{Agent, Storage};
 use anyhow::Result;
@@ -51,6 +56,11 @@ impl ResourceManager {
     pub async fn config(&self) -> Arc<TomlConfig> {
         let inner = self.inner.read().await;
         inner.config()
+    }
+
+    pub async fn get_sf_capability(&self) -> Result<bool> {
+        let inner = self.inner.read().await;
+        inner.get_sf_capability().await
     }
 
     pub async fn get_device_manager(&self) -> Arc<RwLock<DeviceManager>> {
@@ -98,6 +108,14 @@ impl ResourceManager {
     ) -> Result<Vec<Arc<dyn Volume>>> {
         let inner = self.inner.read().await;
         inner.handler_volumes(cid, spec).await
+    }
+
+    pub async fn handle_sharefsfiles(
+        &self,
+        share_fs_file: &mut share_fs_volume::ShareFsFile,
+    ) -> Result<()> {
+        let inner = self.inner.read().await;
+        inner.handle_sharefsfiles(share_fs_file).await
     }
 
     pub async fn handler_devices(&self, cid: &str, linux: &Linux) -> Result<Vec<Device>> {
