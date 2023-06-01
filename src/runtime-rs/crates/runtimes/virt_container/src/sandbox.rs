@@ -94,7 +94,10 @@ impl VirtSandbox {
         network_env: SandboxNetworkEnv,
     ) -> Result<Vec<ResourceConfig>> {
         let mut resource_configs = vec![];
-        info!(sl!(), "created? {:?}, netns: {:?}", network_env.network_created, network_env.netns);
+        info!(
+            sl!(),
+            "created? {:?}, netns: {:?}", network_env.network_created, network_env.netns
+        );
         if !network_env.network_created {
             if let Some(netns_path) = network_env.netns {
                 let network_config = ResourceConfig::Network(
@@ -207,7 +210,6 @@ impl Sandbox for VirtSandbox {
             .await
             .context("set up device before start vm")?;
 
-
         // execute pre-start hook functions, including Prestart Hooks and CreateRuntime Hooks
         let (prestart_hooks, create_runtime_hooks) = match spec.hooks.as_ref() {
             Some(hooks) => (hooks.prestart.clone(), hooks.create_runtime.clone()),
@@ -215,7 +217,6 @@ impl Sandbox for VirtSandbox {
         };
         self.execute_oci_hook_functions(&prestart_hooks, &create_runtime_hooks, state)
             .await?;
-
 
         // 1. if there are pre-start hook functions, network config might have been changed.
         //    We need to rescan the netns to handle the change.

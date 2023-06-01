@@ -9,9 +9,7 @@ use inner::FcInner;
 use anyhow::Context;
 use persist::sandbox_persist::Persist;
 
-use crate::{
-    device::DeviceType, Hypervisor, VcpuThreadIds,
-};
+use crate::{device::DeviceType, Hypervisor, VcpuThreadIds};
 
 use anyhow::Result;
 use async_trait::async_trait;
