@@ -26,7 +26,7 @@ use super::{
         Endpoint, IPVlanEndpoint, MacVlanEndpoint, PhysicalEndpoint, VethEndpoint, VlanEndpoint,
     },
     network_entity::NetworkEntity,
-    network_info::network_info_from_link::{NetworkInfoFromLink, handle_addresses},
+    network_info::network_info_from_link::{handle_addresses, NetworkInfoFromLink},
     utils::{link, netns},
     Network,
 };
@@ -176,8 +176,10 @@ async fn get_entity_from_netns(config: &NetworkWithNetNsConfig) -> Result<Vec<Ne
         if (attrs.flags & libc::IFF_LOOPBACK as u32) != 0 {
             continue;
         }
-        
-        let ip_addresses = handle_addresses(&handle, attrs).await.context("handle addresses")?;
+
+        let ip_addresses = handle_addresses(&handle, attrs)
+            .await
+            .context("handle addresses")?;
         // Ignore unconfigured network interfaces. These are either base tunnel devices that are not namespaced
         // like gre0, gretap0, sit0, ipip0, tunl0 or incorrectly setup interfaces.
         if ip_addresses.len() == 0 {
@@ -185,9 +187,10 @@ async fn get_entity_from_netns(config: &NetworkWithNetNsConfig) -> Result<Vec<Ne
         }
 
         let idx = idx.fetch_add(1, Ordering::Relaxed);
-        let (endpoint, network_info) = create_endpoint(&handle, link.as_ref(), ip_addresses, idx, config)
-            .await
-            .context("create endpoint")?;
+        let (endpoint, network_info) =
+            create_endpoint(&handle, link.as_ref(), ip_addresses, idx, config)
+                .await
+                .context("create endpoint")?;
 
         entity_list.push(NetworkEntity::new(endpoint, network_info));
     }
