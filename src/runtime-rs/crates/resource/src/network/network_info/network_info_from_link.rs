@@ -58,7 +58,10 @@ impl NetworkInfoFromLink {
     }
 }
 
-pub async fn handle_addresses(handle: &rtnetlink::Handle, attrs: &LinkAttrs) -> Result<Vec<IPAddress>> {
+pub async fn handle_addresses(
+    handle: &rtnetlink::Handle,
+    attrs: &LinkAttrs,
+) -> Result<Vec<IPAddress>> {
     let mut addr_msg_list = handle
         .address()
         .get()
