@@ -14,6 +14,7 @@ pub mod hypervisor_persist;
 pub use device::driver::*;
 use device::DeviceType;
 pub mod dragonball;
+pub mod firecracker;
 mod kernel_param;
 pub mod qemu;
 pub use kernel_param::Param;
@@ -55,6 +56,7 @@ const SHMEM: &str = "shmem";
 
 pub const HYPERVISOR_DRAGONBALL: &str = "dragonball";
 pub const HYPERVISOR_QEMU: &str = "qemu";
+pub const HYPERVISOR_FIRECRACKER: &str = "firecracker";
 
 #[derive(PartialEq, Debug, Clone)]
 pub(crate) enum VmmState {

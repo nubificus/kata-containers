@@ -1359,6 +1359,8 @@ dependencies = [
  "dragonball",
  "futures 0.3.28",
  "go-flag",
+ "hyper",
+ "hyperlocal",
  "kata-sys-util",
  "kata-types",
  "lazy_static",
@@ -1507,6 +1509,7 @@ dependencies = [
 name = "kata-sys-util"
 version = "0.1.0"
 dependencies = [
+ "anyhow",
  "byteorder",
  "cgroups-rs",
  "chrono",
