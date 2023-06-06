@@ -17,7 +17,9 @@ use common::{
     Sandbox, SandboxNetworkEnv,
 };
 use containerd_shim_protos::events::task::TaskOOM;
-use hypervisor::{dragonball::Dragonball, Hypervisor, HYPERVISOR_DRAGONBALL};
+use hypervisor::{
+    dragonball::Dragonball, Hypervisor, HYPERVISOR_DRAGONBALL, HYPERVISOR_FIRECRACKER,
+};
 use kata_sys_util::hooks::HookStates;
 use kata_types::config::TomlConfig;
 use resource::{
@@ -424,7 +426,15 @@ impl Persist for VirtSandbox {
             resource: Some(self.resource_manager.save().await?),
             hypervisor: Some(self.hypervisor.save_state().await?),
         };
-        persist::to_disk(&sandbox_state, &self.sid)?;
+        let h = sandbox_state.hypervisor.clone().unwrap_or_default();
+        if h.hypervisor_type.as_str() == HYPERVISOR_FIRECRACKER && h.jailed {
+            persist::to_disk(
+                &sandbox_state,
+                &[HYPERVISOR_FIRECRACKER, "/", &self.sid].concat(),
+            )?;
+        } else {
+            persist::to_disk(&sandbox_state, &self.sid)?;
+        }
         Ok(sandbox_state)
     }
     /// Restore Sandbox
