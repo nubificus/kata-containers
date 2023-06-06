@@ -29,6 +29,21 @@ pub fn to_disk<T: serde::Serialize>(value: &T, sid: &str) -> Result<()> {
     Err(anyhow!("invalid sid {}", sid))
 }
 
+pub fn to_disk_jailed<T: serde::Serialize>(value: &T, sid: &str, prefix: &str) -> Result<()> {
+    verify_id(sid).context("failed to verify sid")?;
+    let mut path = scoped_join(KATA_PATH, [prefix, "/", sid].concat())?;
+    if path.exists() {
+        path.push(PERSIST_FILE);
+        let f = File::create(path)
+            .context("failed to create the file")
+            .context("failed to join the path")?;
+        let j = serde_json::to_value(value).context("failed to convert to the json value")?;
+        serde_json::to_writer_pretty(f, &j)?;
+        return Ok(());
+    }
+    Err(anyhow!("invalid sid {}", sid))
+}
+
 pub fn from_disk<T>(sid: &str) -> Result<T>
 where
     T: de::DeserializeOwned,

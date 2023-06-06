@@ -1402,6 +1402,8 @@ dependencies = [
  "dragonball",
  "futures 0.3.28",
  "go-flag",
+ "hyper",
+ "hyperlocal",
  "kata-sys-util",
  "kata-types",
  "lazy_static",

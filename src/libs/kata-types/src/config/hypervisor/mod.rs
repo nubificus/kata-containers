@@ -44,6 +44,9 @@ pub use self::qemu::{QemuConfig, HYPERVISOR_NAME_QEMU};
 mod ch;
 pub use self::ch::{CloudHypervisorConfig, HYPERVISOR_NAME_CH};
 
+mod firecracker;
+pub use self::firecracker::{FirecrackerConfig, HYPERVISOR_NAME_FIRECRACKER};
+
 const VIRTIO_BLK_PCI: &str = "virtio-blk-pci";
 const VIRTIO_BLK_MMIO: &str = "virtio-blk-mmio";
 const VIRTIO_BLK_CCW: &str = "virtio-blk-ccw";

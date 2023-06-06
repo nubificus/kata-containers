@@ -14,7 +14,7 @@ use async_trait::async_trait;
 use common::message::{Action, Message};
 use common::{Sandbox, SandboxNetworkEnv};
 use containerd_shim_protos::events::task::TaskOOM;
-use hypervisor::{dragonball::Dragonball, BlockConfig, Hypervisor, HYPERVISOR_DRAGONBALL};
+use hypervisor::{dragonball::Dragonball, BlockConfig, Hypervisor, HYPERVISOR_DRAGONBALL, HYPERVISOR_FIRECRACKER};
 use hypervisor::{utils::get_hvsock_path, HybridVsockConfig, DEFAULT_GUEST_VSOCK_CID};
 use kata_sys_util::hooks::HookStates;
 use kata_types::config::TomlConfig;
@@ -268,10 +268,6 @@ impl Sandbox for VirtSandbox {
             .await
             .context("set up device before start vm")?;
 
-        // start vm
-        self.hypervisor.start_vm(10_000).await.context("start vm")?;
-        info!(sl!(), "start vm");
-
         // execute pre-start hook functions, including Prestart Hooks and CreateRuntime Hooks
         let (prestart_hooks, create_runtime_hooks) = match spec.hooks.as_ref() {
             Some(hooks) => (hooks.prestart.clone(), hooks.create_runtime.clone()),
@@ -307,6 +303,10 @@ impl Sandbox for VirtSandbox {
                     .context("set up device after start vm")?;
             }
         }
+
+        // start vm
+        self.hypervisor.start_vm(10_000).await.context("start vm")?;
+        info!(sl!(), "start vm");
 
         // connect agent
         // set agent socket
@@ -504,7 +504,12 @@ impl Persist for VirtSandbox {
             resource: Some(self.resource_manager.save().await?),
             hypervisor: Some(self.hypervisor.save_state().await?),
         };
-        persist::to_disk(&sandbox_state, &self.sid)?;
+        let h = sandbox_state.hypervisor.clone().unwrap_or_default();
+        if h.hypervisor_type.as_str() == HYPERVISOR_FIRECRACKER && h.jailed {
+            persist::to_disk_jailed(&sandbox_state, &self.sid, HYPERVISOR_FIRECRACKER)?;
+        } else {
+            persist::to_disk(&sandbox_state, &self.sid)?;
+        }
         Ok(sandbox_state)
     }
     /// Restore Sandbox
