@@ -87,7 +87,6 @@ pub const MAX_CH_VCPUS: u32 = 256;
 pub const MIN_CH_MEMORY_SIZE_MB: u32 = 64;
 
 //Default configuration for firecracker
-pub const DEFAULT_FIRECRACKER_BINARY_PATH: &str = "";
 pub const DEFAULT_FIRECRACKER_ENTROPY_SOURCE: &str = "/dev/urandom";
 pub const DEFAULT_FIRECRACKER_MEMORY_SIZE_MB: u32 = 128;
 pub const DEFAULT_FIRECRACKER_MEMORY_SLOTS: u32 = 128;

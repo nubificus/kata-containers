@@ -59,8 +59,6 @@ impl KernelParams {
             Param::new("earlyprintk", "ttyS0"),
             Param::new("initcall_debug", ""),
             Param::new("panic", "1"),
-            Param::new("pci", "off"),
-            Param::new("iommu", "off"),
             Param::new("systemd.unit", "kata-containers.target"),
             Param::new("systemd.mask", "systemd-networkd.service"),
         ];
@@ -119,6 +117,10 @@ impl KernelParams {
 
     pub(crate) fn append(&mut self, params: &mut KernelParams) {
         self.params.append(&mut params.params);
+    }
+
+    pub(crate) fn push(&mut self, new_param: Param){
+        self.params.push(new_param);
     }
 
     pub(crate) fn from_string(params_string: &str) -> Self {

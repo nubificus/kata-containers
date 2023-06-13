@@ -1,5 +1,5 @@
 use crate::firecracker::utils::*;
-use crate::{firecracker::FcInner, kernel_param::KernelParams, NetworkConfig};
+use crate::{firecracker::FcInner, Param,kernel_param::KernelParams, NetworkConfig};
 use anyhow::{anyhow, Context, Result};
 use dbs_utils::net::MacAddr;
 use hyper::{Body, Method, Request, Response};
@@ -63,11 +63,12 @@ impl FcInner {
     pub(crate) async fn prepare_api_socket(&mut self, id: &str) -> Result<()> {
         self.asock_path = get_api_socket_path(id, self.jailed, false)?;
 
-        match fs::remove_file(&self.asock_path).await {
+        match fs::try_exists(&self.asock_path).await {
             Err(e) if e.kind() != ErrorKind::NotFound => error!(
                 sl!(),
-                "ERROR: {:?} deleting API socket {:?}", e, self.asock_path
+                "ERROR: {:?} in finding  API socket {:?}", e, self.asock_path
             ),
+            Ok(true) => info!(sl!(), "API socket already exists!"),
             _ => {}
         }
         Ok(())
@@ -97,6 +98,8 @@ impl FcInner {
 
     pub(crate) async fn prepare_vmm_resources(&mut self, id: &str) -> Result<()> {
         let mut kernel_params = KernelParams::new(self.config.debug_info.enable_debug);
+        kernel_params.push(Param::new("pci", "off"));
+        kernel_params.push(Param::new("iommu", "off"));
         let rootfs_driver = self.config.blockdev_info.block_device_driver.clone();
 
         kernel_params.append(&mut KernelParams::new_rootfs_kernel_params(
