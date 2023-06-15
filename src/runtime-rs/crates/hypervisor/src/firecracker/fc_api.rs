@@ -1,5 +1,5 @@
 use crate::firecracker::utils::*;
-use crate::{firecracker::FcInner, Param,kernel_param::KernelParams, NetworkConfig};
+use crate::{firecracker::FcInner, kernel_param::KernelParams, NetworkConfig, Param};
 use anyhow::{anyhow, Context, Result};
 use dbs_utils::net::MacAddr;
 use hyper::{Body, Method, Request, Response};

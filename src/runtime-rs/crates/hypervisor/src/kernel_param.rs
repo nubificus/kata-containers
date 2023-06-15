@@ -119,7 +119,7 @@ impl KernelParams {
         self.params.append(&mut params.params);
     }
 
-    pub(crate) fn push(&mut self, new_param: Param){
+    pub(crate) fn push(&mut self, new_param: Param) {
         self.params.push(new_param);
     }
 

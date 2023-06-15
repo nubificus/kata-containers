@@ -428,10 +428,7 @@ impl Persist for VirtSandbox {
         };
         let h = sandbox_state.hypervisor.clone().unwrap_or_default();
         if h.hypervisor_type.as_str() == HYPERVISOR_FIRECRACKER && h.jailed {
-            persist::to_disk(
-                &sandbox_state,
-                &[HYPERVISOR_FIRECRACKER, "/", &self.sid].concat(),
-            )?;
+            persist::to_disk_jailed(&sandbox_state, &self.sid, HYPERVISOR_FIRECRACKER)?;
         } else {
             persist::to_disk(&sandbox_state, &self.sid)?;
         }

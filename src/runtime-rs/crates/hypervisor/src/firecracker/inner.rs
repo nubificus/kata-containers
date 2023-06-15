@@ -1,7 +1,7 @@
+use crate::firecracker::utils::get_api_socket_path;
 use crate::HypervisorState;
 use crate::HYPERVISOR_FIRECRACKER;
 use crate::{device::DeviceType, VmmState};
-use crate::firecracker::utils::get_api_socket_path;
 use anyhow::{Context, Result};
 use async_trait::async_trait;
 use hyper::Client;
@@ -77,7 +77,7 @@ impl FcInner {
                     &self.jailer_root,
                     "--",
                     "--api-sock",
-                   &get_api_socket_path(&self.id, self.jailed, true)?,
+                    &get_api_socket_path(&self.id, self.jailed, true)?,
                 ];
                 cmd.args(args);
             }
