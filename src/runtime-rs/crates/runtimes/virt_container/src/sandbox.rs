@@ -363,7 +363,7 @@ impl Sandbox for VirtSandbox {
             .await
             .context("resource clean up")?;
 
-        // TODO: cleanup other snadbox resource
+        // TODO: cleanup other sandbox resource
         Ok(())
     }
 

@@ -133,6 +133,10 @@ FIRMWARETDVFVOLUMEPATH :=
 FIRMWARESEVPATH := $(PREFIXDEPS)/share/ovmf/OVMF.fd
 FIRMWARESNPPATH := $(PREFIXDEPS)/share/ovmf/OVMF.fd
 
+ROOTMEASURECONFIG ?= ""
+KERNELPARAMS += $(ROOTMEASURECONFIG)
+KERNELTDXPARAMS += $(ROOTMEASURECONFIG)
+
 # Name of default configuration file the runtime will use.
 CONFIG_FILE = configuration.toml
 
@@ -228,7 +232,7 @@ DEFVIRTIOFSQUEUESIZE ?= 1024
 #
 # see `virtiofsd -h` for possible options.
 # Make sure you quote args.
-DEFVIRTIOFSEXTRAARGS ?= [\"--thread-pool-size=1\", \"-o\", \"announce_submounts\"]
+DEFVIRTIOFSEXTRAARGS ?= [\"--thread-pool-size=1\", \"--announce-submounts\"]
 DEFENABLEIOTHREADS := false
 DEFENABLEVHOSTUSERSTORE := false
 DEFVHOSTUSERSTOREPATH := $(PKGRUNDIR)/vhost-user
