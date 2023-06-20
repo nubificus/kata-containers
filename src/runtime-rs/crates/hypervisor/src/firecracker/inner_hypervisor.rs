@@ -135,6 +135,10 @@ impl FcInner {
         Ok(())
     }
 
+    pub(crate) async fn resize_vcpu(&self, old_vcpu: u32, new_vcpu: u32) -> Result<(u32, u32)> {
+        Ok((old_vcpu, new_vcpu))
+    }
+
     pub(crate) async fn check(&self) -> Result<()> {
         info!(sl!(), "FcInner: Check");
         Ok(())
