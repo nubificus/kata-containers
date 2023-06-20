@@ -28,7 +28,9 @@ impl FcInner {
 
         Ok(())
     }
-
+    
+    // Since Firecracker doesn't support sharefs, we patch block devices on pre-start inserted
+    // dummy drives
     pub(crate) async fn hotplug_block_device(&mut self, path: &str, id: u64) -> Result<()> {
         self.patch_container_rootfs(&id.to_string(), path).await?;
         Ok(())
