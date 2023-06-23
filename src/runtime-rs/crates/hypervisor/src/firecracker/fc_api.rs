@@ -1,5 +1,5 @@
 use crate::firecracker::utils::*;
-use crate::{firecracker::FcInner, kernel_param::KernelParams, NetworkConfig, Param};
+use crate::{firecracker::FcInner, kernel_param::KernelParams, NetworkConfig, Param, HYPERVISOR_FIRECRACKER};
 use anyhow::{anyhow, Context, Result};
 use dbs_utils::net::MacAddr;
 use hyper::{Body, Method, Request, Response};
@@ -14,7 +14,7 @@ const REQUEST_RETRY: u32 = 500;
 const FC_KERNEL: &str = "vmlinux";
 const FC_ROOT_FS: &str = "rootfs";
 const DRIVE_PREFIX: &str = "drive";
-const DISK_POOL_SIZE: u32 = 5;
+const DISK_POOL_SIZE: u32 = 6;
 
 impl FcInner {
     pub(crate) fn get_resource(&self, src: &str, dst: &str) -> Result<String> {
@@ -32,9 +32,9 @@ impl FcInner {
 
         let jailed_location = [
             self.jailer_root.as_str(),
-            "firecracker",
+            HYPERVISOR_FIRECRACKER,
             &self.id,
-            "root",
+            ROOT,
             dst,
         ]
         .join("/");
@@ -45,17 +45,23 @@ impl FcInner {
         abs_path.push_str(dst);
         Ok(abs_path)
     }
-
-    pub(crate) fn remount_jailer_with_exec(&self) -> Result<()> {
+    
+    // Remounting jailer root to ensure it has exec permissions, since firecracker binary will
+    // execute from there
+    pub(crate) async fn remount_jailer_with_exec(&self) -> Result<()> {
+        let dest = &[&self.jailer_root, "/", HYPERVISOR_FIRECRACKER, "/", &self.id, "/", ROOT].concat();
+        let _ = fs::create_dir_all(dest)
+            .await
+            .context(format!("failed to create directory {:?}", dest));
         mount::bind_mount_unchecked(
-            self.jailer_root.as_str(),
-            self.jailer_root.as_str(),
+            dest,
+            dest,
             false,
             MsFlags::MS_SHARED,
         )
         .context("bind mount jailer root")?;
 
-        mount::bind_remount(self.jailer_root.as_str(), false)
+        mount::bind_remount(dest, false)
             .context("rebind mount jailer root")?;
         Ok(())
     }
@@ -88,7 +94,7 @@ impl FcInner {
         let body_vsock: String = json!({
             "guest_cid": 3,
             "uds_path": rel_uds_path,
-            "vsock_id": "root"
+            "vsock_id": ROOT,
         })
         .to_string();
 
@@ -142,8 +148,8 @@ impl FcInner {
         let sb_path = get_sandbox_path(id)?;
 
         let abs_dummy_path = match self.jailed {
-            false => [&sb_path, "root"].join("/"),
-            true => [&self.jailer_root, "firecracker", &self.id, "root"].join("/"),
+            false => [&sb_path, ROOT].join("/"),
+            true => [&self.jailer_root, HYPERVISOR_FIRECRACKER, &self.id, ROOT].join("/"),
         };
 
         let rel_dummy_path = "/".to_string();
@@ -151,6 +157,8 @@ impl FcInner {
             .await
             .context(format!("failed to create directory {:?}", &abs_dummy_path));
 
+        // We create some placeholder drives to be used for patching block devices while the vmm is
+        // running
         for i in 1..DISK_POOL_SIZE {
             let full_path_name = format!("{}/drive{}.ext4", abs_dummy_path, i);
 
@@ -254,6 +262,9 @@ impl FcInner {
         uri: hyper::Uri,
         data: String,
     ) -> Result<()> {
+        debug!(sl!(), "METHOD: {:?}", method.clone());
+        debug!(sl!(), "URI: {:?}", uri.clone());
+        debug!(sl!(), "DATA: {:?}", data.clone());
         for _count in 0..REQUEST_RETRY {
             let req = Request::builder()
                 .method(method.clone())
@@ -310,21 +321,21 @@ impl FcInner {
     }
     pub(crate) fn cleanup_resource(&self, sb_path: &String) {
         if self.jailed {
-            let jailed_path = ["firecracker", &self.id, "root"].join("/");
-            self.umount_jail_resource(FC_KERNEL).ok();
-            self.umount_jail_resource(FC_ROOT_FS).ok();
+            let jailed_path = &[HYPERVISOR_FIRECRACKER, &self.id, ROOT].join("/");
+            self.umount_jail_resource(&[jailed_path, FC_KERNEL].join("/")).ok();
+            self.umount_jail_resource(&[jailed_path, FC_ROOT_FS].join("/")).ok();
 
             for i in 1..DISK_POOL_SIZE {
-                self.umount_jail_resource(&[DRIVE_PREFIX, &i.to_string()].concat())
+                self.umount_jail_resource(&[jailed_path, "/", DRIVE_PREFIX, &i.to_string()].concat())
                     .ok();
-                self.umount_jail_resource("").ok();
             }
+
+            self.umount_jail_resource(jailed_path).ok();
 
             std::fs::remove_dir_all(
                 [
                     self.jailer_root.clone(),
-                    "firecracker".to_string(),
-                    self.id.clone(),
+                    HYPERVISOR_FIRECRACKER.to_string(),
                 ]
                 .join("/"),
             )

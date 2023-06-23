@@ -22,15 +22,8 @@ impl FcInner {
         if !self.config.jailer_path.is_empty() {
             self.jailed = true;
             self.jailer_root = KATA_PATH.to_string();
-            let _ = self.remount_jailer_with_exec();
-            let _ = fs::create_dir_all([&self.jailer_root, HYPERVISOR_FIRECRACKER, id].join("/"))
-                .await
-                .context(format!(
-                    "failed to create directory {:?}",
-                    [&self.jailer_root, HYPERVISOR_FIRECRACKER, id].join("/")
-                ));
-
             self.vm_path = [KATA_PATH, HYPERVISOR_FIRECRACKER, id].join("/");
+            let _ = self.remount_jailer_with_exec().await;
         } else {
             let _ = fs::create_dir_all(&sb_path)
                 .await
@@ -145,7 +138,7 @@ impl FcInner {
     }
 
     pub(crate) async fn get_jailer_root(&self) -> Result<String> {
-        info!(sl!(), "FcInner: Get jailerroot");
+        info!(sl!(), "FcInner: Get jailer root");
         Ok(self.jailer_root.clone())
     }
 
