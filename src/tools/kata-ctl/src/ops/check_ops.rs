@@ -15,7 +15,15 @@ use crate::types::*;
 
 use anyhow::{anyhow, Result};
 
+use slog::{info, o, warn};
+
 const NAME: &str = "kata-ctl";
+
+macro_rules! sl {
+    () => {
+        slog_scope::logger().new(o!("subsystem" => "check_ops"))
+    };
+}
 
 // This function retrieves the cmd function passes as argument
 fn get_builtin_check_func(name: CheckType) -> Result<BuiltinCmdFp> {
@@ -55,14 +63,12 @@ fn print_check_list() -> Result<()> {
     let cmds = get_client_cmd_details();
 
     if cmds.is_empty() {
-        println!("Checks not found!\n");
+        warn!(sl!(), "Checks not found!\n");
 
         return Ok(());
     }
 
-    cmds.iter().for_each(|n| println!(" - {}", n));
-
-    println!();
+    cmds.iter().for_each(|n| info!(sl!(), " - {}", n));
 
     Ok(())
 }
@@ -73,15 +79,21 @@ pub fn handle_check(checkcmd: CheckArgument) -> Result<()> {
     match command {
         CheckSubCommand::All => {
             // run architecture-specific tests
-            handle_builtin_check(CheckType::CheckCpu, "")?;
+            handle_builtin_check(CheckType::Cpu, "")?;
 
             // run code that uses network checks
             check::run_network_checks()?;
+
+            // run kernel module checks
+            handle_builtin_check(CheckType::KernelModules, "")?;
+
+            // run kvm checks
+            handle_builtin_check(CheckType::KvmIsUsable, "")?;
         }
 
         CheckSubCommand::NoNetworkChecks => {
             // run architecture-specific tests
-            handle_builtin_check(CheckType::CheckCpu, "")?;
+            handle_builtin_check(CheckType::Cpu, "")?;
         }
 
         CheckSubCommand::CheckVersionOnly => {
@@ -104,10 +116,6 @@ pub fn handle_check(checkcmd: CheckArgument) -> Result<()> {
     Ok(())
 }
 
-pub fn handle_env() -> Result<()> {
-    Ok(())
-}
-
 pub fn handle_factory() -> Result<()> {
     Ok(())
 }
@@ -123,6 +131,6 @@ pub fn handle_metrics(_args: MetricsCommand) -> Result<()> {
 pub fn handle_version() -> Result<()> {
     let version = version::get().unwrap();
 
-    println!("{} version {:?} (type: rust)", NAME, version);
+    info!(sl!(), "{} version {:?} (type: rust)", NAME, version);
     Ok(())
 }

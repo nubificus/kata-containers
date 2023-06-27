@@ -6,20 +6,23 @@
 
 use super::vmm_instance::VmmInstance;
 use crate::{
-    device::Device, hypervisor_persist::HypervisorState, kernel_param::KernelParams, VmmState,
+    device::DeviceType, hypervisor_persist::HypervisorState, kernel_param::KernelParams, VmmState,
     DEV_HUGEPAGES, HUGETLBFS, HYPERVISOR_DRAGONBALL, SHMEM, VM_ROOTFS_DRIVER_BLK,
+    VM_ROOTFS_DRIVER_MMIO,
 };
 use anyhow::{anyhow, Context, Result};
 use async_trait::async_trait;
 use dragonball::{
-    api::v1::{BlockDeviceConfigInfo, BootSourceConfig},
+    api::v1::{BlockDeviceConfigInfo, BootSourceConfig, VcpuResizeInfo},
     vm::VmConfigInfo,
 };
+
 use kata_sys_util::mount;
 use kata_types::{
     capabilities::{Capabilities, CapabilityBits},
     config::hypervisor::Hypervisor as HypervisorConfig,
 };
+use nix::mount::MsFlags;
 use persist::sandbox_persist::Persist;
 use shim_interface::KATA_PATH;
 use std::{collections::HashSet, fs::create_dir_all, path::PathBuf};
@@ -56,7 +59,7 @@ pub struct DragonballInner {
     pub(crate) run_dir: String,
 
     /// pending device
-    pub(crate) pending_devices: Vec<Device>,
+    pub(crate) pending_devices: Vec<DeviceType>,
 
     /// cached block device
     pub(crate) cached_block_devices: HashSet<String>,
@@ -230,7 +233,8 @@ impl DragonballInner {
         }
 
         let jailed_location = [self.jailer_root.as_str(), dst].join("/");
-        mount::bind_mount_unchecked(src, jailed_location.as_str(), false).context("bind_mount")?;
+        mount::bind_mount_unchecked(src, jailed_location.as_str(), false, MsFlags::MS_SLAVE)
+            .context("bind_mount")?;
 
         let mut abs_path = String::from("/");
         abs_path.push_str(dst);
@@ -265,7 +269,7 @@ impl DragonballInner {
             .get_resource(path, DRAGONBALL_ROOT_FS)
             .context("get resource")?;
 
-        if driver == VM_ROOTFS_DRIVER_BLK {
+        if driver == VM_ROOTFS_DRIVER_BLK || driver == VM_ROOTFS_DRIVER_MMIO {
             let blk_cfg = BlockDeviceConfigInfo {
                 path_on_host: PathBuf::from(jail_drive),
                 drive_id: DRAGONBALL_ROOT_FS.to_string(),
@@ -324,6 +328,53 @@ impl DragonballInner {
                 }
             }
         }
+    }
+
+    // check if resizing info is valid
+    // the error in this function is not ok to be tolerated, the container boot will fail
+    fn precheck_resize_vcpus(&self, old_vcpus: u32, new_vcpus: u32) -> Result<(u32, u32)> {
+        // old_vcpus > 0, safe for conversion
+        let current_vcpus = old_vcpus;
+
+        // a non-zero positive is required
+        if new_vcpus == 0 {
+            return Err(anyhow!("resize vcpu error: 0 vcpu resizing is invalid"));
+        }
+
+        // cannot exceed maximum value
+        if new_vcpus > self.config.cpu_info.default_maxvcpus {
+            return Err(anyhow!("resize vcpu error: cannot greater than maxvcpus"));
+        }
+
+        Ok((current_vcpus, new_vcpus))
+    }
+
+    // do the check before resizing, returns Result<(old, new)>
+    pub(crate) async fn resize_vcpu(&self, old_vcpus: u32, new_vcpus: u32) -> Result<(u32, u32)> {
+        if old_vcpus == new_vcpus {
+            info!(
+                sl!(),
+                "resize_vcpu: no need to resize vcpus because old_vcpus is equal to new_vcpus"
+            );
+            return Ok((new_vcpus, new_vcpus));
+        }
+
+        let (old_vcpus, new_vcpus) = self.precheck_resize_vcpus(old_vcpus, new_vcpus)?;
+        info!(
+            sl!(),
+            "check_resize_vcpus passed, passing new_vcpus = {:?} to vmm", new_vcpus
+        );
+
+        let cpu_resize_info = VcpuResizeInfo {
+            vcpu_count: Some(new_vcpus as u8),
+        };
+        self.vmm_instance
+            .resize_vcpu(&cpu_resize_info)
+            .context(format!(
+                "failed to do_resize_vcpus on new_vcpus={:?}",
+                new_vcpus
+            ))?;
+        Ok((old_vcpus, new_vcpus))
     }
 
     pub fn set_hypervisor_config(&mut self, config: HypervisorConfig) {

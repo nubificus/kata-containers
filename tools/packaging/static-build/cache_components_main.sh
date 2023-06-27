@@ -12,7 +12,9 @@ script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
 source "${script_dir}/../scripts/lib.sh"
 
-KERNEL_FLAVOUR="${KERNEL_FLAVOUR:-kernel}" # kernel | kernel-experimental | kernel-arm-experimetnal | kernel-dragonball-experimental
+KERNEL_FLAVOUR="${KERNEL_FLAVOUR:-kernel}" # kernel | kernel-nvidia-gpu | kernel-experimental | kernel-arm-experimental | kernel-dragonball-experimental | kernel-tdx-experimental | kernel-nvidia-gpu-tdx-experimental | kernel-nvidia-gpu-snp
+OVMF_FLAVOUR="${OVMF_FLAVOUR:-x86_64}" # x86_64 | tdx
+QEMU_FLAVOUR="${QEMU_FLAVOUR:-qemu}" # qemu | qemu-tdx-experimental | qemu-snp-experimental
 ROOTFS_IMAGE_TYPE="${ROOTFS_IMAGE_TYPE:-image}" # image | initrd
 
 cache_clh_artifacts() {
@@ -31,8 +33,40 @@ cache_kernel_artifacts() {
 	local kernel_tarball_name="kata-static-${KERNEL_FLAVOUR}.tar.xz"
 	local current_kernel_image="$(get_kernel_image_name)"
 	local current_kernel_kata_config_version="$(cat ${repo_root_dir}/tools/packaging/kernel/kata_config_version)"
-	local current_kernel_version="$(get_from_kata_deps "assets.${KERNEL_FLAVOUR}.version")-${current_kernel_kata_config_version}"
-	create_cache_asset "${kernel_tarball_name}" "${current_kernel_version}" "${current_kernel_image}"
+	local kernel_modules_tarball_path="${repo_root_dir}/tools/packaging/kata-deploy/local-build/build/kata-static-kernel-sev-modules.tar.xz"
+
+	# The ${vendor}-gpu kernels are based on an already existing entry, and does not require
+	# adding a new entry to the versions.yaml.
+	#
+	# With this in mind, let's just make sure we get the version from correct entry in the
+	# versions.yaml file.
+	case ${KERNEL_FLAVOUR} in
+		*"nvidia-gpu"*)
+			KERNEL_FLAVOUR=${KERNEL_FLAVOUR//"-nvidia-gpu"/}
+			;;
+		*)
+			;;
+	esac
+
+	case ${KERNEL_FLAVOUR} in
+		"kernel-sev"|"kernel-snp")
+			# In these cases, like "kernel-foo", it must be set to "kernel.foo" when looking at
+			# the versions.yaml file
+			current_kernel_version="$(get_from_kata_deps "assets.${KERNEL_FLAVOUR/-/.}.version")"
+			;;
+		*)
+			current_kernel_version="$(get_from_kata_deps "assets.${KERNEL_FLAVOUR}.version")"
+			;;
+	esac
+
+	create_cache_asset "${kernel_tarball_name}" "${current_kernel_version}-${current_kernel_kata_config_version}" "${current_kernel_image}"
+	if [[ "${KERNEL_FLAVOUR}" == "kernel-sev" ]]; then
+		module_dir="${repo_root_dir}/tools/packaging/kata-deploy/local-build/build/kernel-sev/builddir/kata-linux-${current_kernel_version#v}-${current_kernel_kata_config_version}/lib/modules/${current_kernel_version#v}"
+		if [ ! -f "${kernel_modules_tarball_path}" ]; then
+			tar cvfJ "${kernel_modules_tarball_path}" "${module_dir}/kernel/drivers/virt/coco/efi_secret/"
+		fi
+		create_cache_asset "kata-static-kernel-sev-modules.tar.xz" "${current_kernel_version}-${current_kernel_kata_config_version}" "${current_kernel_image}"
+	fi
 }
 
 cache_nydus_artifacts() {
@@ -41,9 +75,28 @@ cache_nydus_artifacts() {
 	create_cache_asset "${nydus_tarball_name}" "${current_nydus_version}" ""
 }
 
+cache_ovmf_artifacts() {
+	local current_ovmf_version="$(get_from_kata_deps "externals.ovmf.${OVMF_FLAVOUR}.version")"
+	case ${OVMF_FLAVOUR} in
+		"tdx")
+			ovmf_tarball_name="kata-static-tdvf.tar.xz"
+			;;
+		"x86_64")
+			ovmf_tarball_name="kata-static-ovmf.tar.xz"
+			;;
+		*)
+			ovmf_tarball_name="kata-static-ovmf-${OVMF_FLAVOUR}.tar.xz"
+			;;
+	esac
+			
+	local current_ovmf_image="$(get_ovmf_image_name)"
+	create_cache_asset "${ovmf_tarball_name}" "${current_ovmf_version}" "${current_ovmf_image}"
+}
+
 cache_qemu_artifacts() {
-	local qemu_tarball_name="kata-static-qemu.tar.xz"
-	local current_qemu_version=$(get_from_kata_deps "assets.hypervisor.qemu.version")
+	local qemu_tarball_name="kata-static-${QEMU_FLAVOUR}.tar.xz"
+	local current_qemu_version=$(get_from_kata_deps "assets.hypervisor.${QEMU_FLAVOUR}.version")
+	[ -z "${current_qemu_version}" ] && current_qemu_version=$(get_from_kata_deps "assets.hypervisor.${QEMU_FLAVOUR}.tag")
 	local qemu_sha=$(calc_qemu_files_sha256sum)
 	local current_qemu_image="$(get_qemu_image_name)"
 	create_cache_asset "${qemu_tarball_name}" "${current_qemu_version}-${qemu_sha}" "${current_qemu_image}"
@@ -105,10 +158,12 @@ Usage: $0 "[options]"
 		-c	Cloud hypervisor cache
 		-F	Firecracker cache
 		-k	Kernel cache
-			* Export KERNEL_FLAVOUR="kernel|kernek-experimental|kernel-arm-experimental|kernel-dragonball-experimental" for a specific build
+			* Export KERNEL_FLAVOUR="kernel | kernel-nvidia-gpu | kernel-experimental | kernel-arm-experimental | kernel-dragonball-experimental | kernel-tdx-experimental | kernel-nvidia-gpu-tdx-experimental | kernel-nvidia-gpu-snp" for a specific build
 			  The default KERNEL_FLAVOUR value is "kernel"
 		-n	Nydus cache
 		-q 	QEMU cache
+			* Export QEMU_FLAVOUR="qemu | qemu-tdx-experimental | qemu-snp-experimental" for a specific build
+			  The default QEMU_FLAVOUR value is "qemu"
 		-r 	RootFS cache
 			* Export ROOTFS_IMAGE_TYPE="image|initrd" for one of those two types
 			  The default ROOTFS_IMAGE_TYPE value is "image"
@@ -124,12 +179,13 @@ main() {
 	local firecracker_component="${firecracker_component:-}"
 	local kernel_component="${kernel_component:-}"
 	local nydus_component="${nydus_component:-}"
+	local ovmf_component="${ovmf_component:-}"
 	local qemu_component="${qemu_component:-}"
 	local rootfs_component="${rootfs_component:-}"
 	local shim_v2_component="${shim_v2_component:-}"
 	local virtiofsd_component="${virtiofsd_component:-}"
 	local OPTIND
-	while getopts ":cFknqrsvh:" opt
+	while getopts ":cFknoqrsvh:" opt
 	do
 		case "$opt" in
 		c)
@@ -143,6 +199,9 @@ main() {
 			;;
 		n)
 			nydus_component="1"
+			;;
+		o)
+			ovmf_component="1"
 			;;
 		q)
 			qemu_component="1"
@@ -173,6 +232,7 @@ main() {
 	[[ -z "${firecracker_component}" ]] && \
 	[[ -z "${kernel_component}" ]] && \
 	[[ -z "${nydus_component}" ]] && \
+	[[ -z "${ovmf_component}" ]] && \
 	[[ -z "${qemu_component}" ]] && \
 	[[ -z "${rootfs_component}" ]] && \
 	[[ -z "${shim_v2_component}" ]] && \
@@ -187,6 +247,7 @@ main() {
 	[ "${firecracker_component}" == "1" ] && cache_firecracker_artifacts
 	[ "${kernel_component}" == "1" ] && cache_kernel_artifacts
 	[ "${nydus_component}" == "1" ] && cache_nydus_artifacts
+	[ "${ovmf_component}" == "1" ] && cache_ovmf_artifacts
 	[ "${qemu_component}" == "1" ] && cache_qemu_artifacts
 	[ "${rootfs_component}" == "1" ] && cache_rootfs_artifacts
 	[ "${shim_v2_component}" == "1" ] && cache_shim_v2_artifacts

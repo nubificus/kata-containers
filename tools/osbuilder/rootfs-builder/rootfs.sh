@@ -16,6 +16,7 @@ AGENT_VERSION=${AGENT_VERSION:-}
 RUST_VERSION="null"
 AGENT_BIN=${AGENT_BIN:-kata-agent}
 AGENT_INIT=${AGENT_INIT:-no}
+MEASURED_ROOTFS=${MEASURED_ROOTFS:-no}
 KERNEL_MODULES_DIR=${KERNEL_MODULES_DIR:-""}
 OSBUILDER_VERSION="unknown"
 DOCKER_RUNTIME=${DOCKER_RUNTIME:-runc}
@@ -207,11 +208,11 @@ docker_extra_args()
 		args+=" -v ${gentoo_local_portage_dir}:/usr/portage/packages"
 		args+=" --volumes-from ${gentoo_portage_container}"
 		;;
-        debian | ubuntu | suse)
+	debian | ubuntu | suse)
 		source /etc/os-release
 
 		case "$ID" in
-                fedora | centos | rhel)
+		fedora | centos | rhel)
 			# Depending on the podman version, we'll face issues when passing
 		        # `--security-opt apparmor=unconfined` on a system where not apparmor is not installed.
 			# Because of this, let's just avoid adding this option when the host OS comes from Red Hat.
@@ -434,6 +435,7 @@ build_rootfs_distro()
 			--env AGENT_INIT="${AGENT_INIT}" \
 			--env ARCH="${ARCH}" \
 			--env CI="${CI}" \
+			--env MEASURED_ROOTFS="${MEASURED_ROOTFS}" \
 			--env KERNEL_MODULES_DIR="${KERNEL_MODULES_DIR}" \
 			--env LIBC="${LIBC}" \
 			--env EXTRA_PKGS="${EXTRA_PKGS}" \
@@ -472,9 +474,6 @@ prepare_overlay()
 		ln -sf  /init ./sbin/init
 	fi
 
-	# Kata systemd unit file
-	mkdir -p ./etc/systemd/system/basic.target.wants/
-	ln -sf /usr/lib/systemd/system/kata-containers.target ./etc/systemd/system/basic.target.wants/kata-containers.target
 	popd  > /dev/null
 }
 
@@ -623,9 +622,12 @@ EOF
 	if [ "${AGENT_INIT}" == "yes" ]; then
 		setup_agent_init "${AGENT_DEST}" "${init}"
 	else
-		# Setup systemd service for kata-agent
+		# Setup systemd-based environment for kata-agent
 		mkdir -p "${ROOTFS_DIR}/etc/systemd/system/basic.target.wants"
 		ln -sf "/usr/lib/systemd/system/kata-containers.target" "${ROOTFS_DIR}/etc/systemd/system/basic.target.wants/kata-containers.target"
+		mkdir -p "${ROOTFS_DIR}/etc/systemd/system/kata-containers.target.wants"
+		ln -sf "/usr/lib/systemd/system/dbus.socket" "${ROOTFS_DIR}/etc/systemd/system/kata-containers.target.wants/dbus.socket"
+		chmod g+rx,o+x "${ROOTFS_DIR}"
 	fi
 
 	info "Check init is installed"

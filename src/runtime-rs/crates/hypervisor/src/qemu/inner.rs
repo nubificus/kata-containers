@@ -104,6 +104,11 @@ impl QemuInner {
         todo!()
     }
 
+    pub(crate) async fn resize_vcpu(&self, _old_vcpus: u32, _new_vcpus: u32) -> Result<(u32, u32)> {
+        info!(sl!(), "QemuInner::resize_vcpu()");
+        todo!()
+    }
+
     pub(crate) async fn get_pids(&self) -> Result<Vec<u32>> {
         info!(sl!(), "QemuInner::get_pids()");
         todo!()
@@ -133,16 +138,16 @@ impl QemuInner {
     }
 }
 
-use crate::device::Device;
+use crate::device::DeviceType;
 
 // device manager part of Hypervisor
 impl QemuInner {
-    pub(crate) async fn add_device(&mut self, device: Device) -> Result<()> {
+    pub(crate) async fn add_device(&mut self, device: DeviceType) -> Result<()> {
         info!(sl!(), "QemuInner::add_device() {}", device);
         todo!()
     }
 
-    pub(crate) async fn remove_device(&mut self, device: Device) -> Result<()> {
+    pub(crate) async fn remove_device(&mut self, device: DeviceType) -> Result<()> {
         info!(sl!(), "QemuInner::remove_device() {} ", device);
         todo!()
     }

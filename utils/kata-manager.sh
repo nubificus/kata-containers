@@ -160,6 +160,8 @@ github_get_release_file_url()
 		-r '.[] | select(.tag_name == $version) | .assets[].browser_download_url' |\
 		grep "/${regex}$")
 
+        download_url=$(echo $download_url | awk '{print $1}')
+
 	[ -z "$download_url" ] && die "Cannot determine download URL for version $version ($url)"
 
 	echo "$download_url"
@@ -260,7 +262,7 @@ pre_checks()
 	command -v "${kata_shim_v2}" &>/dev/null \
 		&& die "Please remove existing $kata_project installation"
 
-	[skip_containerd = "false" ] && return 0
+	[ "$skip_containerd" = 'true' ] && return 0
 
 	local ret
 

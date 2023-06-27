@@ -17,7 +17,7 @@ use anyhow::{anyhow, Context, Result};
 use async_trait::async_trait;
 use common::{
     message::{Action, Message},
-    Sandbox,
+    Sandbox, SandboxNetworkEnv,
 };
 use containerd_shim_protos::events::task::TaskOOM;
 use hypervisor::{dragonball::Dragonball, Hypervisor, HYPERVISOR_DRAGONBALL};
@@ -80,7 +80,9 @@ impl VirtSandbox {
         agent: Arc<dyn Agent>,
         hypervisor: Arc<dyn Hypervisor>,
         resource_manager: Arc<ResourceManager>,
-        ) -> Result<Self> {
+    ) -> Result<Self> {
+        let config = resource_manager.config().await;
+        let keep_abnormal = config.runtime.keep_abnormal;
         Ok(Self {
             sid: sid.to_string(),
             msg_sender: Arc::new(Mutex::new(msg_sender)),
@@ -88,34 +90,25 @@ impl VirtSandbox {
             agent,
             hypervisor,
             resource_manager,
-            monitor: Arc::new(HealthCheck::new(true, false)),
-                })
-            }
+            monitor: Arc::new(HealthCheck::new(true, keep_abnormal)),
+        })
+    }
 
-    async fn prepare_for_start_sandbox(
+    async fn prepare_config_for_sandbox(
         &self,
         _id: &str,
-        netns: Option<String>,
+        network_env: SandboxNetworkEnv,
     ) -> Result<Vec<ResourceConfig>> {
         let mut resource_configs = vec![];
-
-        let config = self.resource_manager.config().await;
-        if let Some(netns_path) = netns {
-            let network_config = ResourceConfig::Network(NetworkConfig::NetworkResourceWithNetNs(
-                NetworkWithNetNsConfig {
-                    network_model: config.runtime.internetworking_model.clone(),
-                    netns_path,
-                    queues: self
-                        .hypervisor
-                        .hypervisor_config()
-                        .await
-                        .network_info
-                        .network_queues as usize,
-                },
-            ));
-            resource_configs.push(network_config);
+        if !network_env.network_created {
+            if let Some(netns_path) = network_env.netns {
+                let network_config = ResourceConfig::Network(
+                    self.prepare_network_config(netns_path, network_env.network_created)
+                        .await,
+                );
+                resource_configs.push(network_config);
+            }
         }
-
         let hypervisor_config = self.hypervisor.hypervisor_config().await;
         let virtio_fs_config = ResourceConfig::ShareFs(hypervisor_config.shared_fs);
         resource_configs.push(virtio_fs_config);
@@ -155,16 +148,43 @@ impl VirtSandbox {
 
         Ok(())
     }
+
+    async fn prepare_network_config(
+        &self,
+        netns_path: String,
+        network_created: bool,
+    ) -> NetworkConfig {
+        let config = self.resource_manager.config().await;
+        NetworkConfig::NetworkResourceWithNetNs(NetworkWithNetNsConfig {
+            network_model: config.runtime.internetworking_model.clone(),
+            netns_path,
+            queues: self
+                .hypervisor
+                .hypervisor_config()
+                .await
+                .network_info
+                .network_queues as usize,
+            network_created,
+        })
+    }
+
+    fn has_prestart_hooks(
+        &self,
+        prestart_hooks: Vec<oci::Hook>,
+        create_runtime_hooks: Vec<oci::Hook>,
+    ) -> bool {
+        !prestart_hooks.is_empty() || !create_runtime_hooks.is_empty()
+    }
 }
 
 #[async_trait]
 impl Sandbox for VirtSandbox {
     async fn start(
         &self,
-        netns: Option<String>,
         dns: Vec<String>,
         spec: &oci::Spec,
         state: &oci::State,
+        network_env: SandboxNetworkEnv,
     ) -> Result<()> {
         let id = &self.sid;
 
@@ -177,7 +197,7 @@ impl Sandbox for VirtSandbox {
         }
 
         self.hypervisor
-            .prepare_vm(id, netns.clone())
+            .prepare_vm(id, network_env.netns.clone())
             .await
             .context("prepare vm")?;
       
@@ -186,7 +206,9 @@ impl Sandbox for VirtSandbox {
         
         // generate device and setup before start vm
         // should after hypervisor.prepare_vm
-        let resources = self.prepare_for_start_sandbox(id, netns).await?;
+        let resources = self
+            .prepare_config_for_sandbox(id, network_env.clone())
+            .await?;
         self.resource_manager
             .prepare_before_start_vm(resources)
             .await
@@ -204,8 +226,28 @@ impl Sandbox for VirtSandbox {
         self.execute_oci_hook_functions(&prestart_hooks, &create_runtime_hooks, state)
             .await?;
 
-        // TODO: if prestart_hooks is not empty, rescan the network endpoints(rely on hotplug endpoints).
-        // see: https://github.com/kata-containers/kata-containers/issues/6378
+        // 1. if there are pre-start hook functions, network config might have been changed.
+        //    We need to rescan the netns to handle the change.
+        // 2. Do not scan the netns if we want no network for the VM.
+        // TODO In case of vm factory, scan the netns to hotplug interfaces after the VM is started.
+        if self.has_prestart_hooks(prestart_hooks, create_runtime_hooks)
+            && !self
+                .resource_manager
+                .config()
+                .await
+                .runtime
+                .disable_new_netns
+        {
+            if let Some(netns_path) = network_env.netns {
+                let network_resource = self
+                    .prepare_network_config(netns_path, network_env.network_created)
+                    .await;
+                self.resource_manager
+                    .handle_network(network_resource)
+                    .await
+                    .context("set up device after start vm")?;
+            }
+        }
 
         // connect agent
         // set agent socket
@@ -252,7 +294,7 @@ impl Sandbox for VirtSandbox {
         let agent = self.agent.clone();
         let sender = self.msg_sender.clone();
         info!(sl!(), "oom watcher start");
-        let _ = tokio::spawn(async move {
+        tokio::spawn(async move {
             loop {
                 match agent
                     .get_oom_event(agent::Empty::new())
@@ -329,7 +371,7 @@ impl Sandbox for VirtSandbox {
             .await
             .context("resource clean up")?;
 
-        // TODO: cleanup other snadbox resource
+        // TODO: cleanup other sandbox resource
         Ok(())
     }
 
@@ -430,6 +472,7 @@ impl Persist for VirtSandbox {
         }?;
         let agent = Arc::new(KataAgent::new(kata_types::config::Agent::default()));
         let sid = sandbox_args.sid;
+        let keep_abnormal = config.runtime.keep_abnormal;
         let args = ManagerArgs {
             sid: sid.clone(),
             agent: agent.clone(),
@@ -444,7 +487,7 @@ impl Persist for VirtSandbox {
             agent,
             hypervisor,
             resource_manager,
-            monitor: Arc::new(HealthCheck::new(true, false)),
+            monitor: Arc::new(HealthCheck::new(true, keep_abnormal)),
         })
     }
 }

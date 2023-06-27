@@ -12,8 +12,10 @@ mod arch_specific {
     use crate::check;
     use crate::check::{GuestProtection, ProtectionError};
     use crate::types::*;
-    use anyhow::{anyhow, Result};
+    use crate::utils;
+    use anyhow::{anyhow, Context, Result};
     use nix::unistd::Uid;
+    use slog::{info, o, warn};
     use std::fs;
     use std::path::Path;
 
@@ -21,16 +23,55 @@ mod arch_specific {
     const CPUINFO_FLAGS_TAG: &str = "flags";
     const CPU_FLAGS_INTEL: &[&str] = &["lm", "sse4_1", "vmx"];
     const CPU_ATTRIBS_INTEL: &[&str] = &["GenuineIntel"];
+    const VMM_FLAGS: &[&str] = &["hypervisor"];
+
     pub const ARCH_CPU_VENDOR_FIELD: &str = check::GENERIC_CPU_VENDOR_FIELD;
     pub const ARCH_CPU_MODEL_FIELD: &str = check::GENERIC_CPU_MODEL_FIELD;
 
+    macro_rules! sl {
+         () => {
+             slog_scope::logger().new(o!("subsystem" => "x86_64"))
+         };
+    }
+
     // List of check functions
-    static CHECK_LIST: &[CheckItem] = &[CheckItem {
-        name: CheckType::CheckCpu,
-        descr: "This parameter performs the cpu check",
-        fp: check_cpu,
-        perm: PermissionType::NonPrivileged,
-    }];
+    static CHECK_LIST: &[CheckItem] = &[
+        CheckItem {
+            name: CheckType::Cpu,
+            descr: "This parameter performs the cpu check",
+            fp: check_cpu,
+            perm: PermissionType::NonPrivileged,
+        },
+        CheckItem {
+            name: CheckType::KernelModules,
+            descr: "This parameter performs the kvm check",
+            fp: check_kernel_modules,
+            perm: PermissionType::NonPrivileged,
+        },
+        CheckItem {
+            name: CheckType::KvmIsUsable,
+            descr: "This parameter performs check to see if KVM is usable",
+            fp: check_kvm_is_usable,
+            perm: PermissionType::Privileged,
+        },
+    ];
+
+    static MODULE_LIST: &[KernelModule] = &[
+        KernelModule {
+            name: "kvm",
+            parameter: KernelParam {
+                name: "kvmclock_periodic_sync",
+                value: KernelParamType::Simple("Y"),
+            },
+        },
+        KernelModule {
+            name: "kvm_intel",
+            parameter: KernelParam {
+                name: "unrestricted_guest",
+                value: KernelParamType::Predicate(unrestricted_guest_param_check),
+            },
+        },
+    ];
 
     pub fn get_checks() -> Option<&'static [CheckItem<'static>]> {
         Some(CHECK_LIST)
@@ -38,7 +79,7 @@ mod arch_specific {
 
     // check cpu
     fn check_cpu(_args: &str) -> Result<()> {
-        println!("INFO: check CPU: x86_64");
+        info!(sl!(), "check CPU: x86_64");
 
         let cpu_info = check::get_single_cpu_info(check::PROC_CPUINFO, CPUINFO_DELIMITER)?;
 
@@ -55,14 +96,11 @@ mod arch_specific {
         // TODO: Add more information to output (see kata-check in go tool); adjust formatting
         let missing_cpu_attributes = check::check_cpu_attribs(&cpu_info, CPU_ATTRIBS_INTEL)?;
         if !missing_cpu_attributes.is_empty() {
-            eprintln!(
-                "WARNING: Missing CPU attributes {:?}",
-                missing_cpu_attributes
-            );
+            warn!(sl!(), "Missing CPU attributes {:?}", missing_cpu_attributes);
         }
         let missing_cpu_flags = check::check_cpu_flags(&cpu_flags, CPU_FLAGS_INTEL)?;
         if !missing_cpu_flags.is_empty() {
-            eprintln!("WARNING: Missing CPU flags {:?}", missing_cpu_flags);
+            warn!(sl!(), "Missing CPU flags {:?}", missing_cpu_flags);
         }
 
         Ok(())
@@ -80,6 +118,19 @@ mod arch_specific {
         })?;
 
         Ok(cpu_flags)
+    }
+
+    pub fn get_cpu_details() -> Result<(String, String)> {
+        utils::get_generic_cpu_details(check::PROC_CPUINFO)
+    }
+
+    // check if kvm is usable
+    fn check_kvm_is_usable(_args: &str) -> Result<()> {
+        info!(sl!(), "check if kvm is usable: x86_64");
+
+        let result = check::check_kvm_is_usable_generic();
+
+        result.context("KVM check failed")
     }
 
     pub const TDX_SYS_FIRMWARE_DIR: &str = "/sys/firmware/tdx_seam/";
@@ -140,6 +191,120 @@ mod arch_specific {
         }
 
         Ok(GuestProtection::NoProtection)
+    }
+
+    fn running_on_vmm() -> Result<bool> {
+        match check::get_single_cpu_info(check::PROC_CPUINFO, CPUINFO_DELIMITER) {
+            Ok(cpu_info) => {
+                // check if the 'hypervisor' flag exist in the cpu features
+                let missing_hypervisor_flag = check::check_cpu_attribs(&cpu_info, VMM_FLAGS)?;
+
+                if missing_hypervisor_flag.is_empty() {
+                    return Ok(true);
+                }
+            }
+            Err(e) => {
+                return Err(anyhow!(
+                    "Unable to determine if the OS is running on a VM: {}: {}",
+                    e,
+                    check::PROC_CPUINFO
+                ));
+            }
+        }
+
+        Ok(false)
+    }
+
+    // check the host kernel parameter value is valid
+    // and check if we are running inside a VMM
+    fn unrestricted_guest_param_check(
+        module: &str,
+        param_name: &str,
+        param_value_host: &str,
+    ) -> Result<()> {
+        let expected_param_value: char = 'Y';
+
+        let running_on_vmm_alt = running_on_vmm()?;
+
+        if running_on_vmm_alt {
+            let msg = format!("You are running in a VM, where the kernel module '{}' parameter '{:}' has a value '{:}'. This causes conflict when running kata.",
+                module,
+                param_name,
+                param_value_host
+            );
+            return Err(anyhow!(msg));
+        }
+
+        if param_value_host == expected_param_value.to_string() {
+            Ok(())
+        } else {
+            let error_msg = format!(
+                "Kernel Module: '{:}' parameter '{:}' should have value '{:}', but found '{:}.'.",
+                module, param_name, expected_param_value, param_value_host
+            );
+
+            let action_msg = format!("Remove the '{:}' module using `rmmod` and then reload using `modprobe`, setting '{:}={:}'",
+                module,
+                param_name,
+                expected_param_value
+            );
+
+            Err(anyhow!("{} {}", error_msg, action_msg))
+        }
+    }
+
+    fn check_kernel_param(
+        module: &str,
+        param_name: &str,
+        param_value_host: &str,
+        param_type: KernelParamType,
+    ) -> Result<()> {
+        match param_type {
+            KernelParamType::Simple(param_value_req) => {
+                if param_value_host != param_value_req {
+                    return Err(anyhow!(
+                        "Kernel module '{}': parameter '{}' should have value '{}', but found '{}'",
+                        module,
+                        param_name,
+                        param_value_req,
+                        param_value_host
+                    ));
+                }
+                Ok(())
+            }
+            KernelParamType::Predicate(pred_func) => {
+                pred_func(module, param_name, param_value_host)
+            }
+        }
+    }
+
+    fn check_kernel_modules(_args: &str) -> Result<()> {
+        info!(sl!(), "check kernel modules for: x86_64");
+
+        for module in MODULE_LIST {
+            let module_loaded =
+                check::check_kernel_module_loaded(module.name, module.parameter.name);
+
+            match module_loaded {
+                Ok(param_value_host) => {
+                    let parameter_check = check_kernel_param(
+                        module.name,
+                        module.parameter.name,
+                        &param_value_host,
+                        module.parameter.value.clone(),
+                    );
+
+                    match parameter_check {
+                        Ok(_v) => info!(sl!(), "{} Ok", module.name),
+                        Err(e) => return Err(e),
+                    }
+                }
+                Err(err) => {
+                    warn!(sl!(), "{:}", err.replace('\n', ""))
+                }
+            }
+        }
+        Ok(())
     }
 }
 

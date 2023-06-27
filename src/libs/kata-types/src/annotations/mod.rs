@@ -308,6 +308,18 @@ pub const KATA_ANNO_CFG_DISABLE_NEW_NETNS: &str =
 /// A sandbox annotation to specify how attached VFIO devices should be treated.
 pub const KATA_ANNO_CFG_VFIO_MODE: &str = "io.katacontainers.config.runtime.vfio_mode";
 
+/// A sandbox annotation used to specify prefetch_files.list host path container image
+/// being used,
+/// and runtime will pass it to Hypervisor to  search for corresponding prefetch list file.
+/// "io.katacontainers.config.hypervisor.prefetch_files.list"
+///                                = "/path/to/<uid>/xyz.com/fedora:36/prefetch_file.list"
+pub const KATA_ANNO_CFG_HYPERVISOR_PREFETCH_FILES_LIST: &str =
+    "io.katacontainers.config.hypervisor.prefetch_files.list";
+
+/// A sandbox annotation for sandbox level volume sharing with host.
+pub const KATA_ANNO_CFG_SANDBOX_BIND_MOUNTS: &str =
+    "io.katacontainers.config.runtime.sandbox_bind_mounts";
+
 /// A helper structure to query configuration information by check annotations.
 #[derive(Debug, Default, Deserialize)]
 pub struct Annotation {
@@ -409,10 +421,10 @@ impl Annotation {
         match self.get_value::<u32>(KATA_ANNO_CONTAINER_RES_SWAPPINESS) {
             Ok(r) => {
                 if r.unwrap_or_default() > 100 {
-                    return Err(io::Error::new(
+                    Err(io::Error::new(
                         io::ErrorKind::InvalidData,
                         format!("{} greater than 100", r.unwrap_or_default()),
-                    ));
+                    ))
                 } else {
                     Ok(r)
                 }
@@ -672,6 +684,9 @@ impl Annotation {
                     KATA_ANNO_CFG_HYPERVISOR_ENTROPY_SOURCE => {
                         hv.machine_info.validate_entropy_source(value)?;
                         hv.machine_info.entropy_source = value.to_string();
+                    }
+                    KATA_ANNO_CFG_HYPERVISOR_PREFETCH_FILES_LIST => {
+                        hv.prefetch_list_path = value.to_string();
                     }
                     // Hypervisor Memory related annotations
                     KATA_ANNO_CFG_HYPERVISOR_DEFAULT_MEMORY => {
@@ -938,6 +953,16 @@ impl Annotation {
                     },
                     KATA_ANNO_CFG_VFIO_MODE => {
                         config.runtime.vfio_mode = value.to_string();
+                    }
+                    KATA_ANNO_CFG_SANDBOX_BIND_MOUNTS => {
+                        let args: Vec<String> = value
+                            .to_string()
+                            .split_ascii_whitespace()
+                            .map(str::to_string)
+                            .collect();
+                        for arg in args {
+                            config.runtime.sandbox_bind_mounts.push(arg.to_string());
+                        }
                     }
                     _ => {
                         warn!(sl!(), "Annotation {} not enabled", key);
