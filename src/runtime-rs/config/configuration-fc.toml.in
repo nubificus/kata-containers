@@ -16,6 +16,13 @@ path = "@FCPATH@"
 kernel = "@KERNELPATH_FC@"
 image = "@IMAGEPATH@"
 
+agent_path= "@AGENTPATH@"
+debug= "@AGENTDEBUG@"
+backends= @BACKENDS@
+backends_library= "@BACKENDSLIB@"
+endpoint_port= "@ENDPOINTPORT@"
+execution_type= @AGENTEXECTYPE@
+
 rootfs_type=@DEFROOTFSTYPE@
 # List of valid annotation names for the hypervisor
 # Each member of the list is a regular expression, which is the base name
