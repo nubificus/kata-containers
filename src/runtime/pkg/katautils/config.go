@@ -1247,8 +1247,10 @@ func LoadConfiguration(configPath string, ignoreLogging bool) (resolvedConfigPat
 
 	config.DisableGuestEmptyDir = tomlConf.Runtime.DisableGuestEmptyDir
 
-	if err := checkConfig(config); err != nil {
-		return "", config, err
+	if config.HypervisorConfig.Unikernel == false {
+		if err := checkConfig(config); err != nil {
+			return "", config, err
+		}
 	}
 
 	return resolved, config, nil

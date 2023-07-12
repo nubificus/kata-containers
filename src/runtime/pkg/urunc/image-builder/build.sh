@@ -23,7 +23,6 @@ create_dockerfile () {
     cat <<EOF >./Dockerfile
 FROM scratch
 COPY $1 /unikernel/
-COPY $2 /
 EOF
 }
 
