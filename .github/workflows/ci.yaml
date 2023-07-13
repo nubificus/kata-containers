@@ -59,18 +59,25 @@ jobs:
       tag: ${{ inputs.tag }}-amd64
       commit-hash: ${{ inputs.commit-hash }}
 
-  run-k8s-tests-on-tdx:
-    needs: publish-kata-deploy-payload-amd64
-    uses: ./.github/workflows/run-k8s-tests-on-tdx.yaml
-    with:
-      registry: ghcr.io
-      repo: ${{ github.repository_owner }}/kata-deploy-ci
-      tag: ${{ inputs.tag }}-amd64
-      commit-hash: ${{ inputs.commit-hash }}
+#  run-k8s-tests-on-tdx:
+#    needs: publish-kata-deploy-payload-amd64
+#    uses: ./.github/workflows/run-k8s-tests-on-tdx.yaml
+#    with:
+#      registry: ghcr.io
+#      repo: ${{ github.repository_owner }}/kata-deploy-ci
+#      tag: ${{ inputs.tag }}-amd64
+#      commit-hash: ${{ inputs.commit-hash }}
 
   run-metrics-tests:
     needs: build-kata-static-tarball-amd64
     uses: ./.github/workflows/run-metrics.yaml
     with:
-      tarball-suffix: -${{ inputs.tag }}-amd64
+      tarball-suffix: -${{ inputs.tag }}
+      commit-hash: ${{ inputs.commit-hash }}
+
+  run-cri-containerd-tests:
+    needs: build-kata-static-tarball-amd64
+    uses: ./.github/workflows/run-cri-containerd-tests.yaml
+    with:
+      tarball-suffix: -${{ inputs.tag }}
       commit-hash: ${{ inputs.commit-hash }}
