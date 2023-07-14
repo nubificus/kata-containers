@@ -2,8 +2,6 @@ package containerdshim
 
 import (
 	"context"
-	"encoding/json"
-	"path/filepath"
 	"io"
 	"net"
 	osexec "os/exec"
@@ -37,7 +35,7 @@ type HvtArgsBlock struct {
 type HvtArgs struct {
 	Cmdline string         `json:"cmdline"`
 	Net     HvtArgsNetwork `json:"net"`
-	Blk     HvtArgsBlock   `json:"blk,omitempty"`
+	//Blk     HvtArgsBlock   `json:"blk,omitempty"`
 	Env     []string       `json:"env,omitempty"`
 	Cwd     string         `json:"cwd,omitempty"`
 	Mem     string         `json:"mem,omitempty"`
@@ -100,30 +98,7 @@ func HvtCmd(execData virtcontainers.ExecData) string {
 	// return HvtMonitor + "--net:service0=" + execData.Tap + " " + execData.BinaryPath
 	// /solo5-hvt --net=tap100 -- redis.hvt '{"cmdline":"redis-server","net":{"if":"ukvmif0","cloner":"True","type":"inet","method":"static","addr":"10.10.10.2","mask":"16"}}'
 
-	hvtNet := HvtArgsNetwork{
-		If:     "ukvmif0",
-		Cloner: "True",
-		Type:   "inet",
-		Method: "static",
-		Addr:   execData.IPAddress,
-		Mask:   "0",
-		Gw:   execData.Gateway,
-	}
-
-	hvtBlock := HvtArgsBlock{
-		Source:	"etfs",
-		Path:	"/dev/ld0a",
-		Fstype:	"blk",
-		Mount:	"/data",
-	}
-
-	hvtArgs := HvtArgs{
-		Cmdline: filepath.Base(execData.BinaryPath),//"redis-server",
-		Net:     hvtNet,
-		Blk:     hvtBlock,
-	}
-
-	b, _ := json.Marshal(hvtArgs)
+	funky_cli_opt := "--ip4=" + execData.IPAddress + " --msk=255.255.255.0" + " --gw=" + execData.Gateway
 	cmdString := ""
 	nsString := ""
 	if ns != "" {
@@ -131,19 +106,8 @@ func HvtCmd(execData virtcontainers.ExecData) string {
 	} else {
 		nsString = ""
 	}
-	if execData.BlkDevice != "" {
-		cmdString = nsString + HvtMonitor + " --net=" + execData.Tap + " --disk=" + execData.BlkDevice + " " + execData.BinaryPath + " " + string(b)
-	} else {
-		cmdString = nsString + HvtMonitor + " --net=" + execData.Tap + " " + execData.BinaryPath + " " + string(b)
-	}
+	cmdString = nsString + HvtMonitor + " --net=" + execData.Tap + " --disk=" + execData.BinaryPath + " " + execData.BinaryPath + " " + funky_cli_opt
 
-	// stripped := strings.Replace(cmdString, "\\", "", -1)
-	// unquoted := fmt.Sprintln(stripped)
-	// unqoted, err := strconv.Unquote(stripped)
-	// if err != nil {
-	// 	logrus.WithFields(logF).WithField("err", err.Error()).Error("")
-	// }
-	logrus.WithFields(logF).WithField("cmdline", string(b)).Error("")
 	logrus.WithFields(logF).WithField("cmd", cmdString).Error("")
 	// cmdParts := strings.Split(stripped, " ")
 
