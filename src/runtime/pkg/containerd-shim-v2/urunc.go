@@ -3,6 +3,7 @@ package containerdshim
 import (
 	"context"
 	"io"
+	"os"
 	"net"
 	osexec "os/exec"
 	"strings"
@@ -166,9 +167,13 @@ func CreateCommand(execData virtcontainers.ExecData, container *container) *Comm
 	if len(args) == 1 {
 		shimLog.WithField("cmdString", args[0]).WithFields(logF).Error("exec info")
 		newCmd = osexec.Command(args[0])
+		newCmd.Env = os.Environ()
+		newCmd.Env = append(newCmd.Env, "XILINX_XRT=/opt/xilinx/xrt")
 	} else {
 		name, args := args[0], args[1:]
 		newCmd = osexec.Command(name, args...)
+		newCmd.Env = os.Environ()
+		newCmd.Env = append(newCmd.Env, "XILINX_XRT=/opt/xilinx/xrt")
 	}
 	return &Command{cmdString: cmdString, container: container, id: container.id, stdin: container.stdin, stdout: container.stdout, stderr: container.stderr, bundle: container.bundle, exec: newCmd}
 }
