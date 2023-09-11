@@ -36,7 +36,7 @@ oci = { path = "../../../../libs/oci" }
 persist = { path = "../../persist"}
 resource = { path = "../../resource" }
 
-vagent = { git = "https://git@github.com/nubificus/vaccel-rs-lib.git", branch="main" }
+vagent = { git = "https://github.com/nubificus/vaccel-rs-lib.git", branch="github-action" }
 
 [features]
 vlib = ["vagent/vlib"]
