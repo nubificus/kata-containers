@@ -1403,6 +1403,8 @@ dependencies = [
  "dragonball",
  "futures 0.3.28",
  "go-flag",
+ "hyper",
+ "hyperlocal",
  "hypervisor",
  "kata-sys-util",
  "kata-types",
