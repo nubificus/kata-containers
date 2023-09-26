@@ -14,6 +14,7 @@ pub mod hypervisor_persist;
 pub use device::driver::*;
 use device::DeviceType;
 pub mod dragonball;
+pub mod firecracker;
 mod kernel_param;
 pub mod qemu;
 pub use kernel_param::Param;
@@ -56,6 +57,7 @@ const HUGE_SHMEM: &str = "hugeshmem";
 
 pub const HYPERVISOR_DRAGONBALL: &str = "dragonball";
 pub const HYPERVISOR_QEMU: &str = "qemu";
+pub const HYPERVISOR_FIRECRACKER: &str = "firecracker";
 
 pub const DEFAULT_HYBRID_VSOCK_NAME: &str = "kata.hvsock";
 pub const JAILER_ROOT: &str = "root";

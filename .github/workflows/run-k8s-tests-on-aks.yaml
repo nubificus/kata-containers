@@ -34,6 +34,7 @@ jobs:
           - dragonball
           - qemu
           - stratovirt
+          - firecracker
         instance-type:
           - small
           - normal

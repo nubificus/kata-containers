@@ -17,7 +17,9 @@ use common::message::{Action, Message};
 use common::{Sandbox, SandboxNetworkEnv};
 use containerd_shim_protos::events::task::TaskOOM;
 use hypervisor::VsockConfig;
-use hypervisor::{dragonball::Dragonball, BlockConfig, Hypervisor, HYPERVISOR_DRAGONBALL};
+use hypervisor::{
+    dragonball::Dragonball, BlockConfig, Hypervisor, HYPERVISOR_DRAGONBALL, HYPERVISOR_FIRECRACKER,
+};
 use hypervisor::{utils::get_hvsock_path, HybridVsockConfig, DEFAULT_GUEST_VSOCK_CID};
 use kata_sys_util::hooks::HookStates;
 use kata_types::capabilities::CapabilityBits;
@@ -570,9 +572,31 @@ impl Persist for VirtSandbox {
         let sandbox_state = crate::sandbox_persist::SandboxState {
             sandbox_type: VIRTCONTAINER.to_string(),
             resource: Some(self.resource_manager.save().await?),
-            hypervisor: Some(self.hypervisor.save_state().await?),
+            //hypervisor: Some(self.hypervisor.save_state().await?),
+            hypervisor: match self.hypervisor.save_state().await?.hypervisor_type.as_str() {
+                // TODO support other hypervisors
+                HYPERVISOR_DRAGONBALL => Ok(Some(self.hypervisor.save_state().await?)),
+                HYPERVISOR_FIRECRACKER => Ok(Some(self.hypervisor.save_state().await?)),
+                _ => Err(anyhow!(
+                    "Unsupported hypervisor {}",
+                    self.hypervisor.save_state().await?.hypervisor_type
+                )),
+            }?,
         };
-        persist::to_disk(&sandbox_state, &self.sid)?;
+        // FIXME: properly handle jailed case
+        // eg: Determine if we are running jailed:
+        // let h = sandbox_state.hypervisor.clone().unwrap_or_default();
+        // Figure out the jailed path:
+        // jailed_path = h.<>
+        // and somehow store the sandbox state into the jail:
+        // persist::to_disk(&sandbox_state, &self.sid, jailed_path)?;
+        // Issue is, how to handle restore.
+        let h = sandbox_state.hypervisor.as_ref().unwrap();
+        let vmpath = match h.jailed {
+            true => h.vm_path.clone(),
+            false => "".to_string(),
+        };
+        persist::to_disk(&sandbox_state, &self.sid, vmpath.as_str())?;
         Ok(sandbox_state)
     }
     /// Restore Sandbox
