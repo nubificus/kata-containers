@@ -43,7 +43,6 @@ vagent = { git = "https://git@github.com/nubificus/vaccel-rs-lib.git", branch="m
 [features]
 default = ["cloud-hypervisor"]
 vlib = ["vagent/vlib"]
-default = []
 
 # Enable the Cloud Hypervisor driver
 cloud-hypervisor = []

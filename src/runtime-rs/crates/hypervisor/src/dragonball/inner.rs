@@ -238,7 +238,8 @@ impl DragonballInner {
             max_vcpu_count: self.config.cpu_info.default_maxvcpus as u8,
             mem_type,
             mem_file_path,
-            pci_hotplug_enabled: true,
+            #[cfg(not(target_arch = "aarch64"))]
+            pci_hotplug_enabled: false,
             ..Default::default()
         };
         info!(sl!(), "vm config: {:?}", vm_config);
