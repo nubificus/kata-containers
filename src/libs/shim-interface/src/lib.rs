@@ -24,13 +24,10 @@ pub mod shim_mgmt;
 
 use kata_sys_util::validate::verify_id;
 use kata_types::config::KATA_PATH;
-use std::path::Path;
 
-// Used to be `shim-monitor.sock`, but due to a char limit of 100
-// when running jailed we can safely reduce the size.
-pub const SHIM_MGMT_SOCK_NAME: &str = "shim.sock";
+pub const SHIM_MGMT_SOCK_NAME: &str = "shim-monitor.sock";
 
-fn get_uds_with_sid(short_id: &str, path: &str, jailed_path: &str) -> Result<String> {
+fn get_uds_with_sid(short_id: &str, path: &str) -> Result<String> {
     verify_id(short_id).context("The short id contains invalid characters.")?;
 
     let kata_run_path = fs::canonicalize(path).context("failed to canonicalize path")?;
@@ -52,18 +49,14 @@ fn get_uds_with_sid(short_id: &str, path: &str, jailed_path: &str) -> Result<Str
             "sandbox with the provided prefix {short_id:?} is not found"
         )),
         1 => {
-            // FIXME: jailed case seems to fail
             // One element and only one exists.
-            let p = match jailed_path {
-                "" => kata_run_path
+            Ok(format!(
+                "unix://{}",
+                kata_run_path
                     .join(target_ids[0].as_str())
-                    .join(SHIM_MGMT_SOCK_NAME),
-                _ => Path::new(jailed_path)
-                    .join(target_ids[0].as_str())
-                    .join(SHIM_MGMT_SOCK_NAME),
-            };
-
-            Ok(format!("unix://{}", p.display()))
+                    .join(SHIM_MGMT_SOCK_NAME)
+                    .display()
+            ))
         }
         _ => {
             // n > 1 return error
@@ -81,17 +74,15 @@ pub fn sb_storage_path() -> String {
 
 // returns the address of the unix domain socket(UDS) for communication with shim
 // management service using http
-// normally returns `unix:///run/kata/{sid}/shim_monitor.sock` or
-// `unix:///run/kata/firecracker/{sid}/root/shim_monitor.sock` when
-// running jailed
-pub fn mgmt_socket_addr(sid: &str, jailed_path: &str) -> Result<String> {
+// normally returns "unix:///run/kata/{sid}/shim_monitor.sock"
+pub fn mgmt_socket_addr(sid: &str) -> Result<String> {
     if sid.is_empty() {
         return Err(anyhow!(
             "Empty sandbox id for acquiring socket address for shim_mgmt"
         ));
     }
 
-    get_uds_with_sid(sid, &sb_storage_path(), jailed_path)
+    get_uds_with_sid(sid, &sb_storage_path())
 }
 
 #[cfg(test)]
@@ -107,9 +98,6 @@ mod tests {
     fn test_mgmt_socket_addr() {
         // this test has to run as root, so has to manually cleanup afterwards
         skip_if_not_root!();
-        let sid = "414123";
-        let addr = mgmt_socket_addr(sid, "").unwrap();
-        assert_eq!(addr, "unix:///run/kata/414123/shim-monitor.sock");
 
         let sid = "katatest";
         let sandbox_test = path::Path::new(KATA_PATH).join("katatest98654sandboxpath1");
@@ -147,7 +135,7 @@ mod tests {
         fs::create_dir_all(dir1.as_path()).unwrap();
         fs::create_dir_all(dir2.as_path()).unwrap();
 
-        let result = get_uds_with_sid("kata", &run_path.path().display().to_string(), "");
+        let result = get_uds_with_sid("kata", &run_path.path().display().to_string());
         assert!(result.is_ok());
         assert_eq!(
             result.unwrap(),
@@ -164,7 +152,7 @@ mod tests {
 
     #[test]
     fn test_get_uds_with_sid_with_zero() {
-        let result = get_uds_with_sid("acdsdfe", KATA_PATH, "");
+        let result = get_uds_with_sid("acdsdfe", KATA_PATH);
         assert!(result.is_err());
         if let Err(err) = result {
             let left = format!("{:?}", err.to_string());
@@ -183,7 +171,7 @@ mod tests {
 
     #[test]
     fn test_get_uds_with_sid_with_invalid() {
-        let result = get_uds_with_sid("^abcdse", KATA_PATH, "");
+        let result = get_uds_with_sid("^abcdse", KATA_PATH);
         assert!(result.is_err());
         if let Err(err) = result {
             let left = format!("{:?}", err.to_string());
@@ -207,7 +195,7 @@ mod tests {
         fs::create_dir_all(dir2.as_path()).unwrap();
         fs::create_dir_all(dir3.as_path()).unwrap();
 
-        let result = get_uds_with_sid("kata", &run_path.path().display().to_string(), "");
+        let result = get_uds_with_sid("kata", &run_path.path().display().to_string());
         assert!(result.is_err());
         if let Err(err) = result {
             let left = format!("{:?}", err.to_string());
