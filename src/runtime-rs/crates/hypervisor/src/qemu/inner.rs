@@ -39,6 +39,7 @@ pub struct QemuInner {
     config: HypervisorConfig,
     devices: Vec<DeviceType>,
     netns: Option<String>,
+    vm_path: String,
 }
 
 impl QemuInner {
@@ -50,6 +51,7 @@ impl QemuInner {
             config: Default::default(),
             devices: Vec::new(),
             netns: None,
+            vm_path: Default::default(),
         }
     }
 
@@ -59,6 +61,7 @@ impl QemuInner {
         self.netns = netns;
 
         let vm_path = [KATA_PATH, self.id.as_str()].join("/");
+        self.vm_path = vm_path.clone();
         std::fs::create_dir_all(vm_path)?;
 
         Ok(())
@@ -427,6 +430,8 @@ impl Persist for QemuInner {
             hypervisor_type: HYPERVISOR_QEMU.to_string(),
             id: self.id.clone(),
             config: self.hypervisor_config(),
+            jailed: false,
+            vm_path: self.vm_path.clone(),
             ..Default::default()
         })
     }
@@ -443,6 +448,7 @@ impl Persist for QemuInner {
             config: hypervisor_state.config,
             devices: Vec::new(),
             netns: None,
+            vm_path: hypervisor_state.vm_path,
         })
     }
 }

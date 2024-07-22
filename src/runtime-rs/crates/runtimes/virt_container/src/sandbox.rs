@@ -18,14 +18,12 @@ use common::{Sandbox, SandboxNetworkEnv};
 use containerd_shim_protos::events::task::TaskOOM;
 use hypervisor::VsockConfig;
 #[cfg(not(target_arch = "s390x"))]
-use hypervisor::{dragonball::Dragonball, HYPERVISOR_DRAGONBALL, HYPERVISOR_FIRECRACKER};
-use hypervisor::{qemu::Qemu, HYPERVISOR_QEMU};
+use hypervisor::{dragonball::Dragonball, HYPERVISOR_DRAGONBALL};
 use hypervisor::{utils::get_hvsock_path, HybridVsockConfig, DEFAULT_GUEST_VSOCK_CID};
 use hypervisor::{BlockConfig, Hypervisor};
 use kata_sys_util::hooks::HookStates;
 use kata_types::capabilities::CapabilityBits;
 #[cfg(not(target_arch = "s390x"))]
-use kata_types::config::hypervisor::HYPERVISOR_NAME_CH;
 use kata_types::config::TomlConfig;
 use persist::{self, sandbox_persist::Persist};
 use resource::manager::ManagerArgs;
@@ -576,35 +574,9 @@ impl Persist for VirtSandbox {
         let sandbox_state = crate::sandbox_persist::SandboxState {
             sandbox_type: VIRTCONTAINER.to_string(),
             resource: Some(self.resource_manager.save().await?),
-            hypervisor: match hypervisor_state.hypervisor_type.as_str() {
-                // TODO support other hypervisors
-                #[cfg(not(target_arch = "s390x"))]
-                HYPERVISOR_DRAGONBALL => Ok(Some(hypervisor_state)),
-                #[cfg(not(target_arch = "s390x"))]
-                HYPERVISOR_NAME_CH => Ok(Some(hypervisor_state)),
-                #[cfg(not(target_arch = "s390x"))]
-                HYPERVISOR_FIRECRACKER => Ok(Some(hypervisor_state)),
-                HYPERVISOR_QEMU => Ok(Some(hypervisor_state)),
-                _ => Err(anyhow!(
-                    "Unsupported hypervisor {}",
-                    hypervisor_state.hypervisor_type
-                )),
-            }?,
+            hypervisor: Some(hypervisor_state),
         };
-        // FIXME: properly handle jailed case
-        // eg: Determine if we are running jailed:
-        // let h = sandbox_state.hypervisor.clone().unwrap_or_default();
-        // Figure out the jailed path:
-        // jailed_path = h.<>
-        // and somehow store the sandbox state into the jail:
-        // persist::to_disk(&sandbox_state, &self.sid, jailed_path)?;
-        // Issue is, how to handle restore.
-        let h = sandbox_state.hypervisor.as_ref().unwrap();
-        let vmpath = match h.jailed {
-            true => h.vm_path.clone(),
-            false => "".to_string(),
-        };
-        persist::to_disk(&sandbox_state, &self.sid, vmpath.as_str())?;
+        persist::to_disk(&sandbox_state, &self.sid, "")?;
         Ok(sandbox_state)
     }
     /// Restore Sandbox
@@ -622,10 +594,10 @@ impl Persist for VirtSandbox {
                 let hypervisor = Arc::new(Dragonball::restore((), h).await?) as Arc<dyn Hypervisor>;
                 Ok(hypervisor)
             }
-            HYPERVISOR_QEMU => {
-                let hypervisor = Arc::new(Qemu::restore((), h).await?) as Arc<dyn Hypervisor>;
-                Ok(hypervisor)
-            }
+            //HYPERVISOR_QEMU => {
+            //let hypervisor = Arc::new(Qemu::restore((), h).await?) as Arc<dyn Hypervisor>;
+            //Ok(hypervisor)
+            //}
             _ => Err(anyhow!("Unsupported hypervisor {}", &h.hypervisor_type)),
         }?;
         let agent = Arc::new(KataAgent::new(kata_types::config::Agent::default()));
