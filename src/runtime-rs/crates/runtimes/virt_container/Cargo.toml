@@ -38,7 +38,7 @@ oci-spec = { version = "0.6.8", features = ["runtime"] }
 persist = { path = "../../persist"}
 resource = { path = "../../resource" }
 
-vagent = { git = "https://git@github.com/nubificus/vaccel-rs-lib.git", branch="main" }
+vagent = { git = "https://git@github.com/nubificus/vaccel-rs-lib.git", branch="feat_update_rust" }
 
 [features]
 default = ["cloud-hypervisor"]
