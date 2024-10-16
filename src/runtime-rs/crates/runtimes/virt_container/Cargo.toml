@@ -39,7 +39,7 @@ runtime-spec = { workspace = true }
 persist = { workspace = true }
 resource = { workspace = true }
 
-vagent = { git = "https://git@github.com/nubificus/vaccel-rs-lib.git", branch="main" }
+vagent = { git = "https://git@github.com/nubificus/vaccel-rs-lib.git", branch="feat_update_rust" }
 
 [features]
 default = ["cloud-hypervisor"]

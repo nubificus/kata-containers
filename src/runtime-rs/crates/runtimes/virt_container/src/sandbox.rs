@@ -449,7 +449,8 @@ impl Sandbox for VirtSandbox {
         let hypervisor_config = self.hypervisor.hypervisor_config().await;
         let args = hypervisor_config.vaccel_args;
         let exe_type = args.execution_type.clone();
-        let endpoint_source = [KATA_PATH, id, "root", "kata.hvsock"].join("/");
+        let endpoint_source = [KATA_PATH, id, "kata.hvsock"].join("/");
+
         info!(sl!(), "ENDPOINT SOURCE: {}", endpoint_source);
 
         let endpoint = construct_unix(endpoint_source,args.endpoint_port.to_string()).await?; 
@@ -465,10 +466,6 @@ impl Sandbox for VirtSandbox {
             .prepare_before_start_vm(resources)
             .await
             .context("set up device before start vm")?;
-
-        // start vm
-        self.hypervisor.start_vm(10_000).await.context("start vm")?;
-        info!(sl!(), "start vm");
 
         // execute pre-start hook functions, including Prestart Hooks and CreateRuntime Hooks
         let (prestart_hooks, create_runtime_hooks) =
@@ -515,6 +512,11 @@ impl Sandbox for VirtSandbox {
                     .context("set up device after start vm")?;
             }
         }
+        // start vm
+        self.hypervisor.start_vm(10_000).await.context("start vm")?;
+        info!(sl!(), "start vm");
+
+
 
         // connect agent
         // set agent socket

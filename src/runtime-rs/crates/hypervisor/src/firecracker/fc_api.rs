@@ -26,6 +26,61 @@ const FC_ROOT_FS: &str = "rootfs";
 const DRIVE_PREFIX: &str = "drive";
 const DISK_POOL_SIZE: u32 = 6;
 
+pub struct MachineConfiguration {
+    mem_size_mib: i32,
+    vcpu_count: i32,
+    smt: Option<bool>,
+}
+
+impl MachineConfiguration {
+    pub fn new(mem_size_mib: i32, vcpu_count: i32) -> MachineConfiguration {
+        MachineConfiguration {
+            smt: None,
+            mem_size_mib,
+            vcpu_count,
+        }
+    }
+
+    pub fn set_smt(&mut self, smt: bool) {
+        self.smt = Some(smt);
+    }
+
+    pub fn with_smt(mut self, smt: bool) -> MachineConfiguration {
+        self.smt = Some(smt);
+        self
+    }
+
+    pub fn smt(&self) -> Option<&bool> {
+        self.smt.as_ref()
+    }
+
+    pub fn set_mem_size_mib(&mut self, mem_size_mib: i32) {
+        self.mem_size_mib = mem_size_mib;
+    }
+
+    pub fn with_mem_size_mib(mut self, mem_size_mib: i32) -> MachineConfiguration {
+        self.mem_size_mib = mem_size_mib;
+        self
+    }
+
+    pub fn mem_size_mib(&self) -> &i32 {
+        &self.mem_size_mib
+    }
+
+    pub fn set_vcpu_count(&mut self, vcpu_count: i32) {
+        self.vcpu_count = vcpu_count;
+    }
+
+    pub fn with_vcpu_count(mut self, vcpu_count: i32) -> MachineConfiguration {
+        self.vcpu_count = vcpu_count;
+        self
+    }
+
+    pub fn vcpu_count(&self) -> &i32 {
+        &self.vcpu_count
+    }
+}
+
 impl FcInner {
     pub(crate) fn get_resource(&self, src: &str, dst: &str) -> Result<String> {
         if self.jailed {
