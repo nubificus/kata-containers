@@ -371,6 +371,10 @@ endif
 ifeq ($(DEFAULT_HYPERVISOR),$(HYPERVISOR_REMOTE))
     DEFAULT_HYPERVISOR_CONFIG = $(CONFIG_FILE_REMOTE)
 endif
+
+# When set to true, builds the integrated vaccel rpc agent
+USE_BUILTIN_VACCEL ?= false
+
 # list of variables the user may wish to override
 USER_VARS += ARCH
 USER_VARS += BINDIR
@@ -516,6 +520,7 @@ USER_VARS += KATA_INSTALL_GROUP
 USER_VARS += KATA_INSTALL_OWNER
 USER_VARS += KATA_INSTALL_CFG_PERMS
 USER_VARS += DEFDANCONF
+USER_VARS += USE_BUILTIN_VACCEL
 
 SOURCES := \
   $(shell find . 2>&1 | grep -E '.*\.rs$$') \
@@ -534,10 +539,13 @@ ifeq ($(USE_BUILDIN_DB),true)
     EXTRA_RUSTFEATURES +=  dragonball
 endif
 
-ifneq ($(EXTRA_RUSTFEATURES),)
-    override EXTRA_RUSTFEATURES := --features $(EXTRA_RUSTFEATURES)
+ifeq ($(USE_BUILTIN_VACCEL),true)
+    EXTRA_RUSTFEATURES += vaccel-rpc-agent
 endif
 
+ifneq ($(EXTRA_RUSTFEATURES),)
+    override EXTRA_RUSTFEATURES := --features "$(EXTRA_RUSTFEATURES)"
+endif
 
 TARGET_PATH = target/$(TRIPLE)/$(BUILD_TYPE)/$(TARGET)
 
@@ -610,8 +618,6 @@ GENERATED_FILES += $(CONFIGS)
 
 runtime: $(TARGET)
 
-FEATURES := vlib
-
 static-checks-build: $(GENERATED_FILES)
 
 $(TARGET): $(GENERATED_FILES) $(TARGET_PATH)
@@ -628,9 +634,6 @@ $(GENERATED_FILES): %: %.in
 ##TARGET optimize: optimized  build
 optimize: $(SOURCES) | show-summary show-header
 	@RUSTFLAGS="-C link-arg=-s $(EXTRA_RUSTFLAGS) --deny warnings" cargo build --target $(TRIPLE) --$(BUILD_TYPE) $(EXTRA_RUSTFEATURES)
-
-integrated: $(SOURCES) | show-summary
-	@RUSTFLAGS="$(EXTRA_RUSTFLAGS) --deny warnings" cargo build --features $(FEATURES) --target $(TRIPLE) --$(BUILD_TYPE) $(EXTRA_RUSTFEATURES)
 
 ##TARGET clean: clean build
 clean: clean-generated-files

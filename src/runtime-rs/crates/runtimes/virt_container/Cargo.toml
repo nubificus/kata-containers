@@ -39,15 +39,16 @@ runtime-spec = { workspace = true }
 persist = { workspace = true }
 resource = { workspace = true }
 
-vagent = { git = "https://git@github.com/nubificus/vaccel-rs-lib.git", branch="feat_update_rust" }
+vagent = { git = "https://github.com/nubificus/vaccel-rs-lib.git", branch = "feat_update_rust" }
 
 [features]
 default = ["cloud-hypervisor"]
-vlib = ["vagent/vlib"]
-default = []
 
 # Enable the Cloud Hypervisor driver
 cloud-hypervisor = []
 
 # Enable the build-in VMM Dragtonball
 dragonball = []
+
+# Enable the built-in vAccel RPC agent
+vaccel-rpc-agent = ["vagent/integrated"]
