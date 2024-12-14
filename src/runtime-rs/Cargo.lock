@@ -4914,7 +4914,7 @@ dependencies = [
 [[package]]
 name = "vagent"
 version = "0.1.0"
-source = "git+https://git@github.com/nubificus/vaccel-rs-lib.git?branch=feat_update_rust#88a9dc984e35ed1ace1703cacc68028d19b6a223"
+source = "git+https://github.com/nubificus/vaccel-rs-lib.git?branch=feat_update_rust#88a9dc984e35ed1ace1703cacc68028d19b6a223"
 dependencies = [
  "anyhow",
  "dns-lookup",
