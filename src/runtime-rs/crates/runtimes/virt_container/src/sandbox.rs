@@ -337,7 +337,7 @@ impl VirtSandbox {
            }
            false => {
                info!(sl!(), "INTEGRATED VAGENT ");
-               #[cfg(feature = "vlib")]
+               #[cfg(feature = "vaccel-rpc-agent")]
                let _ = vagent::start_integrated(_endpoint).await?;
            }
        };
