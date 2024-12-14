@@ -250,6 +250,7 @@ impl<AS: GuestAddressSpace> VirtioFs<AS> {
             CachePolicy::Always => Duration::from_secs(CACHE_ALWAYS_TIMEOUT),
             CachePolicy::Never => Duration::from_secs(CACHE_NONE_TIMEOUT),
             CachePolicy::Auto => Duration::from_secs(CACHE_AUTO_TIMEOUT),
+            CachePolicy::Metadata => todo!(),
         }
     }
 

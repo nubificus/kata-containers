@@ -23,15 +23,15 @@ dbs-address-space = { path = "../dbs_address_space" }
 dbs-boot = { path = "../dbs_boot" }
 epoll = ">=4.3.1, <4.3.2"
 io-uring = "0.5.2"
-fuse-backend-rs = { version = "0.10.5", optional = true }
+fuse-backend-rs = { version = "0.12.0", optional = true }
 kvm-bindings = "0.6.0"
 kvm-ioctls = "0.12.0"
 libc = "0.2.119"
 log = "0.4.14"
 nix = "0.24.3"
-nydus-api = "0.3.1"
-nydus-rafs = "0.3.2"
-nydus-storage = "0.6.4"
+nydus-api = { git = "https://github.com/nubificus/nydus.git", branch = "build_openssl_no_vendored" }
+nydus-rafs = { git = "https://github.com/nubificus/nydus.git", branch = "build_openssl_no_vendored" }
+nydus-storage = { git = "https://github.com/nubificus/nydus.git", branch = "build_openssl_no_vendored" }
 rlimit = "0.7.0"
 serde = "1.0.27"
 serde_json = "1.0.9"
