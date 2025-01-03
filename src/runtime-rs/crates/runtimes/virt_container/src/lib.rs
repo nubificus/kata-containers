@@ -101,6 +101,7 @@ impl RuntimeHandler for VirtContainer {
         sandbox_config: SandboxConfig,
     ) -> Result<RuntimeInstance> {
         let hypervisor = new_hypervisor(&config).await.context("new hypervisor")?;
+        let vaccel_config = config.vaccel.clone();
 
         // get uds from hypervisor and get config from toml_config
         let agent = new_agent(&config).context("new agent")?;
@@ -123,6 +124,7 @@ impl RuntimeHandler for VirtContainer {
             hypervisor.clone(),
             resource_manager.clone(),
             sandbox_config,
+            vaccel_config,
         )
         .await
         .context("new virt sandbox")?;

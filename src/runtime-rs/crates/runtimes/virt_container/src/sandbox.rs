@@ -30,9 +30,8 @@ use kata_sys_util::hooks::HookStates;
 use kata_types::capabilities::CapabilityBits;
 #[cfg(not(target_arch = "s390x"))]
 use kata_types::config::hypervisor::HYPERVISOR_NAME_CH;
-use kata_types::config::TomlConfig;
+use kata_types::config::{TomlConfig, Vaccel as VaccelConfig};
 use oci_spec::runtime as oci;
-use kata_types::config::hypervisor::VaccelArgs;
 use persist::{self, sandbox_persist::Persist};
 use protobuf::SpecialFields;
 use resource::manager::ManagerArgs;
@@ -85,6 +84,7 @@ pub struct VirtSandbox {
     monitor: Arc<HealthCheck>,
     sandbox_config: Option<SandboxConfig>,
     vagent: Arc<Mutex<WAgent>>,
+    vaccel_config: Option<VaccelConfig>,
 }
 
 impl std::fmt::Debug for VirtSandbox {
@@ -104,6 +104,7 @@ impl VirtSandbox {
         hypervisor: Arc<dyn Hypervisor>,
         resource_manager: Arc<ResourceManager>,
         sandbox_config: SandboxConfig,
+        vaccel_config: VaccelConfig,
     ) -> Result<Self> {
         let config = resource_manager.config().await;
         let keep_abnormal = config.runtime.keep_abnormal;
@@ -117,6 +118,7 @@ impl VirtSandbox {
             monitor: Arc::new(HealthCheck::new(true, keep_abnormal)),
             sandbox_config: Some(sandbox_config),
             vagent: Arc::new(Mutex::new(WAgent::new())),
+            vaccel_config: Some(vaccel_config),
         })
     }
 
@@ -311,17 +313,17 @@ impl VirtSandbox {
         !prestart_hooks.is_empty() || !create_runtime_hooks.is_empty()
     }
 
-   async fn patch_exec_vagent(&self, endpoint: String, args: VaccelArgs) -> Result<()>{
+   async fn patch_exec_vagent(&self, endpoint: String, args: &VaccelConfig) -> Result<()>{
        info!(sl!(), "BACKENDS: {}", args.backends);
        info!(sl!(), "AGENT PATH: {}", args.agent_path);
        let mut vinner = self.vagent.lock().await;
        vinner
            .patch(
-               args.agent_path,
+               args.agent_path.clone(),
                endpoint,
-               args.debug,
-               args.backends,
-               args.backends_library,
+               args.debug.clone(),
+               args.backends.clone(),
+               args.backends_library.clone(),
                )
            .await
            .context("failed to patch vagent")?;
@@ -374,15 +376,14 @@ impl Sandbox for VirtSandbox {
             .await
             .context("prepare vm")?;
 
-        let hypervisor_config = self.hypervisor.hypervisor_config().await;
-        let args = hypervisor_config.vaccel_args;
+        let args = self.vaccel_config.as_ref().unwrap();
         let exe_type = args.execution_type.clone();
         let endpoint_source = [KATA_PATH, id, "kata.hvsock"].join("/");
 
         info!(sl!(), "ENDPOINT SOURCE: {}", endpoint_source);
 
         let endpoint = construct_unix(endpoint_source,args.endpoint_port.to_string()).await?; 
-        self.patch_exec_vagent(endpoint.clone(),args).await?;
+        self.patch_exec_vagent(endpoint.clone(), &args).await?;
 
         // generate device and setup before start vm
         // should after hypervisor.prepare_vm
@@ -772,6 +773,7 @@ impl Persist for VirtSandbox {
             monitor: Arc::new(HealthCheck::new(true, keep_abnormal)),
             sandbox_config: None,
             vagent: Arc::new(Mutex::new(vagent)),
+            vaccel_config: None,
         })
     }
 }
