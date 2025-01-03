@@ -485,3 +485,11 @@ sandbox_bind_mounts=@DEFBINDMOUNTS@
 # to the hypervisor.
 # (default: /run/kata-containers/dans)
 dan_conf = "@DEFDANCONF@"
+
+[vaccel]
+agent_path= "@AGENTPATH@"
+debug= "@AGENTDEBUG@"
+backends= @BACKENDS@
+backends_library= "@BACKENDSLIB@"
+endpoint_port= "@ENDPOINTPORT@"
+execution_type= @AGENTEXECTYPE@

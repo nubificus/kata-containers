@@ -18,19 +18,11 @@ kernel = "@KERNELPATH_DB@"
 image = "@IMAGEPATH@"
 # initrd = "@INITRDPATH@"
 
-agent_path= "@AGENTPATH@"
-debug= "@AGENTDEBUG@"
-backends= @BACKENDS@
-backends_library= "@BACKENDSLIB@"
-endpoint_port= "@ENDPOINTPORT@"
-execution_type= @AGENTEXECTYPE@
-
 # rootfs filesystem type:
 #   - ext4 (default)
 #   - xfs
 #   - erofs
 rootfs_type=@DEFROOTFSTYPE@
-
  
 # Block storage driver to be used for the VM rootfs is backed
 # by a block device. This is virtio-blk-pci, virtio-blk-mmio or nvdimm
@@ -524,3 +516,11 @@ use_passfd_io = true
 
 # If fd passthrough io is enabled, the runtime will attempt to use the specified port instead of the default port.
 # passfd_listener_port = 1027
+
+[vaccel]
+agent_path= "@AGENTPATH@"
+debug= "@AGENTDEBUG@"
+backends= @BACKENDS@
+backends_library= "@BACKENDSLIB@"
+endpoint_port= "@ENDPOINTPORT@"
+execution_type= @AGENTEXECTYPE@

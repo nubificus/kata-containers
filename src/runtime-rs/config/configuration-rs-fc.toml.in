@@ -370,3 +370,11 @@ experimental=@DEFAULTEXPFEATURES@
 # If enabled, user can run pprof tools with shim v2 process through kata-monitor.
 # (default: false)
 # enable_pprof = true
+
+[vaccel]
+agent_path= "@AGENTPATH@"
+debug= "@AGENTDEBUG@"
+backends= @BACKENDS@
+backends_library= "@BACKENDSLIB@"
+endpoint_port= "@ENDPOINTPORT@"
+execution_type= @AGENTEXECTYPE@
