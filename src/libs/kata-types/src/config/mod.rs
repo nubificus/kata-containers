@@ -34,6 +34,9 @@ pub use self::runtime::{Runtime, RuntimeVendor, RUNTIME_NAME_VIRTCONTAINER};
 
 pub use self::agent::AGENT_NAME_KATA;
 
+mod vaccel;
+pub use self::vaccel::Vaccel;
+
 /// kata run dir
 pub const KATA_PATH: &str = "/run/kata";
 
@@ -113,6 +116,9 @@ pub struct TomlConfig {
     /// Kata runtime configuration information.
     #[serde(default)]
     pub runtime: Runtime,
+    /// Vaccel configuration information.
+    #[serde(default)]
+    pub vaccel: Vaccel,
 }
 
 macro_rules! mem_agent_kv_insert {
