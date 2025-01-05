@@ -10,34 +10,39 @@ use crate::config::{ConfigOps, TomlConfig};
 /// Vaccel configuration information.
 #[derive(Clone, Debug, Default, Deserialize, Serialize)]
 pub struct Vaccel {
-    /// Path to the vaccel agent
+    /// Path to the vaccel agent binary.
     #[serde(default)]
     pub agent_path: String,
-    /// Level of debug from agent with range  [1-4]
+
+    /// Agent server's port.
     #[serde(default)]
-    pub debug: String,
-    /// Plugins to include
+    pub agent_port: u16,
+
+    /// Library path for libvaccel/plugins.
+    #[serde(default)]
+    pub library_path: String,
+
+    /// Backend plugins  to load from agent's libvaccel.
     #[serde(default)]
     pub backends: String,
-    /// Plugins directory
+
+    /// Log level for agent's libvaccel [1-4].
     #[serde(default)]
-    pub backends_library: String,
-    /// Agent's endpoint port
+    pub log_level: u8,
+
+    /// Use built-in agent.
     #[serde(default)]
-    pub endpoint_port: String,
-    /// execution type of vagent exec or integrated
-    #[serde(default)]
-    pub execution_type: String,
+    pub built_in: bool,
 }
 
 impl ConfigOps for Vaccel {
-    fn adjust_config(conf: &mut TomlConfig) -> Result<()> {
+    fn adjust_config(_conf: &mut TomlConfig) -> Result<()> {
         // TODO: Properly implement this
 
         Ok(())
     }
 
-    fn validate(conf: &TomlConfig) -> Result<()> {
+    fn validate(_conf: &TomlConfig) -> Result<()> {
         // TODO: Properly implement this
 
         Ok(())

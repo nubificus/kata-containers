@@ -24,6 +24,7 @@ persist = { path = "crates/persist" }
 resource = { path = "crates/resource" }
 runtimes = { path = "crates/runtimes" }
 service = { path = "crates/service" }
+vaccel-agent = { path = "crates/vaccel-agent" }
 tests_utils = { path = "tests/utils" }
 
 ch-config = { path = "crates/hypervisor/ch-config" }

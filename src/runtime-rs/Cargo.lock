@@ -1271,18 +1271,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "0688c2a7f92e427f44895cd63841bff7b29f8d7a1648b9e7e07a4a365b2e1257"
 
 [[package]]
-name = "dns-lookup"
-version = "1.0.8"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "53ecafc952c4528d9b51a458d1a8904b81783feff9fde08ab6ed2545ff396872"
-dependencies = [
- "cfg-if 1.0.0",
- "libc",
- "socket2 0.4.9",
- "winapi",
-]
-
-[[package]]
 name = "downcast"
 version = "0.11.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -5218,6 +5206,25 @@ dependencies = [
 ]
 
 [[package]]
+name = "vaccel-agent"
+version = "0.1.0"
+dependencies = [
+ "agent",
+ "anyhow",
+ "async-trait",
+ "kata-types",
+ "log",
+ "logging",
+ "slog",
+ "slog-scope",
+ "tokio",
+ "ttrpc 0.8.3",
+ "url",
+ "vaccel",
+ "vaccel-rpc-agent",
+]
+
+[[package]]
 name = "vaccel-rpc-agent"
 version = "0.0.0"
 source = "git+https://github.com/nubificus/vaccel-rust?branch=main#aca26fdde55c62550d3cc14b19fceeb38554fad2"
@@ -5242,18 +5249,6 @@ dependencies = [
  "protobuf 3.7.1",
  "ttrpc 0.8.3",
  "ttrpc-codegen 0.5.0",
-]
-
-[[package]]
-name = "vagent"
-version = "0.1.0"
-source = "git+https://github.com/nubificus/vaccel-rs-lib.git?branch=feat_update_rust#88a9dc984e35ed1ace1703cacc68028d19b6a223"
-dependencies = [
- "anyhow",
- "dns-lookup",
- "nix 0.26.2",
- "tokio",
- "vaccel-rpc-agent",
 ]
 
 [[package]]
@@ -5349,7 +5344,7 @@ dependencies = [
  "toml 0.4.10",
  "tracing",
  "url",
- "vagent",
+ "vaccel-agent",
 ]
 
 [[package]]

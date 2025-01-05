@@ -1,0 +1,25 @@
+[package]
+name = "vaccel-agent"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+anyhow = { workspace = true }
+async-trait = { workspace = true }
+log = { workspace = true }
+slog = { workspace = true }
+slog-scope = { workspace = true }
+tokio = { workspace = true, features = ["fs", "rt-multi-thread", "macros", "process", "sync"] }
+url = { workspace = true }
+
+# Local dependencies
+agent = { workspace = true }
+kata-types = { workspace = true }
+logging = { workspace = true }
+
+ttrpc = { git = "https://github.com/nubificus/ttrpc-rust.git", branch = "vaccel-dev", features = ["async"] }
+vaccel-rpc-agent = { git = "https://github.com/nubificus/vaccel-rust", branch="main", optional = true }
+vaccel = { git = "https://github.com/nubificus/vaccel-rust", branch = "main", optional = true }
+
+[features]
+builtin = ["dep:vaccel-rpc-agent", "dep:vaccel"]

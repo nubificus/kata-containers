@@ -48,6 +48,7 @@ use resource::ResourceManager;
 use sandbox::VIRTCONTAINER;
 use tokio::sync::mpsc::Sender;
 use tracing::instrument;
+use vaccel_agent::VaccelAgent;
 
 unsafe impl Send for VirtContainer {}
 unsafe impl Sync for VirtContainer {}
@@ -105,10 +106,10 @@ impl RuntimeHandler for VirtContainer {
         sandbox_config: SandboxConfig,
     ) -> Result<RuntimeInstance> {
         let hypervisor = new_hypervisor(&config).await.context("new hypervisor")?;
-        let vaccel_config = config.vaccel.clone();
 
         // get uds from hypervisor and get config from toml_config
         let agent = new_agent(&config).context("new agent")?;
+        let vaccel_agent = Arc::new(VaccelAgent::new(config.vaccel.clone())?);
         let resource_manager = Arc::new(
             ResourceManager::new(
                 sid,
@@ -128,7 +129,7 @@ impl RuntimeHandler for VirtContainer {
             hypervisor.clone(),
             resource_manager.clone(),
             sandbox_config,
-            vaccel_config,
+            vaccel_agent,
         )
         .await
         .context("new virt sandbox")?;

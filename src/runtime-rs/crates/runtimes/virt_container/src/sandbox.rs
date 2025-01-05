@@ -4,7 +4,6 @@
 // SPDX-License-Identifier: Apache-2.0
 //
 
-use vagent::{construct_unix, WAgent};
 use agent::kata::KataAgent;
 use agent::types::KernelModule;
 use agent::{
@@ -35,7 +34,7 @@ use kata_sys_util::protection::{available_guest_protection, GuestProtection};
 use kata_types::capabilities::CapabilityBits;
 use kata_types::config::hypervisor::Hypervisor as HypervisorConfig;
 use kata_types::config::hypervisor::HYPERVISOR_NAME_CH;
-use kata_types::config::{TomlConfig, Vaccel as VaccelConfig};
+use kata_types::config::TomlConfig;
 use oci_spec::runtime as oci;
 use persist::{self, sandbox_persist::Persist};
 use protobuf::SpecialFields;
@@ -47,6 +46,7 @@ use std::sync::Arc;
 use strum::Display;
 use tokio::sync::{mpsc::Sender, Mutex, RwLock};
 use tracing::instrument;
+use vaccel_agent::VaccelAgent;
 
 use crate::health_check::HealthCheck;
 
@@ -89,8 +89,7 @@ pub struct VirtSandbox {
     hypervisor: Arc<dyn Hypervisor>,
     monitor: Arc<HealthCheck>,
     sandbox_config: Option<SandboxConfig>,
-    vagent: Arc<Mutex<WAgent>>,
-    vaccel_config: Option<VaccelConfig>,
+    vaccel_agent: Arc<VaccelAgent>,
 }
 
 impl std::fmt::Debug for VirtSandbox {
@@ -110,7 +109,7 @@ impl VirtSandbox {
         hypervisor: Arc<dyn Hypervisor>,
         resource_manager: Arc<ResourceManager>,
         sandbox_config: SandboxConfig,
-        vaccel_config: VaccelConfig,
+        vaccel_agent: Arc<VaccelAgent>,
     ) -> Result<Self> {
         let config = resource_manager.config().await;
         let keep_abnormal = config.runtime.keep_abnormal;
@@ -123,8 +122,7 @@ impl VirtSandbox {
             resource_manager,
             monitor: Arc::new(HealthCheck::new(true, keep_abnormal)),
             sandbox_config: Some(sandbox_config),
-            vagent: Arc::new(Mutex::new(WAgent::new())),
-            vaccel_config: Some(vaccel_config),
+            vaccel_agent,
         })
     }
 
@@ -384,39 +382,6 @@ impl VirtSandbox {
     ) -> bool {
         !prestart_hooks.is_empty() || !create_runtime_hooks.is_empty()
     }
-
-   async fn patch_exec_vagent(&self, endpoint: String, args: &VaccelConfig) -> Result<()>{
-       info!(sl!(), "BACKENDS: {}", args.backends);
-       info!(sl!(), "AGENT PATH: {}", args.agent_path);
-       let mut vinner = self.vagent.lock().await;
-       vinner
-           .patch(
-               args.agent_path.clone(),
-               endpoint,
-               args.debug.clone(),
-               args.backends.clone(),
-               args.backends_library.clone(),
-               )
-           .await
-           .context("failed to patch vagent")?;
-       Ok(())
-   }
-
-   async fn start_vagent(&self, exe_type: &str, _endpoint: String) -> Result<()>{
-       let mut vinner = self.vagent.lock().await;
-       match exe_type == "exec" {
-           true => {
-               info!(sl!(), "EXEC VAGENT ");
-               vinner.start().await.context("start vagent")?;
-           }
-           false => {
-               info!(sl!(), "INTEGRATED VAGENT ");
-               #[cfg(feature = "vaccel-rpc-agent")]
-               let _ = vagent::start_integrated(_endpoint).await?;
-           }
-       };
-       Ok(())
-   }
 }
 
 #[async_trait]
@@ -448,14 +413,10 @@ impl Sandbox for VirtSandbox {
             .await
             .context("prepare vm")?;
 
-        let args = self.vaccel_config.as_ref().unwrap();
-        let exe_type = args.execution_type.clone();
-        let endpoint_source = [KATA_PATH, id, "kata.hvsock"].join("/");
-
-        info!(sl!(), "ENDPOINT SOURCE: {}", endpoint_source);
-
-        let endpoint = construct_unix(endpoint_source,args.endpoint_port.to_string()).await?; 
-        self.patch_exec_vagent(endpoint.clone(), &args).await?;
+        let agent_socket = &self.hypervisor.get_agent_socket().await?;
+        self.vaccel_agent
+            .set_address_from_kata(agent_socket)
+            .await?;
 
         // generate device and setup before start vm
         // should after hypervisor.prepare_vm
@@ -516,8 +477,6 @@ impl Sandbox for VirtSandbox {
         // start vm
         self.hypervisor.start_vm(10_000).await.context("start vm")?;
         info!(sl!(), "start vm");
-
-
 
         // connect agent
         // set agent socket
@@ -605,7 +564,7 @@ impl Sandbox for VirtSandbox {
         });
         self.monitor.start(id, self.agent.clone());
         self.save().await.context("save state")?;
-        self.start_vagent(exe_type.as_str(), endpoint).await?;
+        self.vaccel_agent.start().await?;
         Ok(())
     }
 
@@ -638,8 +597,7 @@ impl Sandbox for VirtSandbox {
             info!(sl!(), "begin stop sandbox");
             self.hypervisor.stop_vm().await.context("stop vm")?;
             sandbox_inner.state = SandboxState::Stopped;
-            let mut vinner = self.vagent.lock().await;
-            vinner.stop().await.context("stop vagent")?;
+            self.vaccel_agent.stop().await?;
             info!(sl!(), "sandbox stopped");
         }
 
@@ -854,7 +812,8 @@ impl Persist for VirtSandbox {
             config,
         };
         let resource_manager = Arc::new(ResourceManager::restore(args, r).await?);
-        let vagent = WAgent::new();
+        // TODO: restore?
+        let vaccel_agent = Arc::new(VaccelAgent::new(kata_types::config::Vaccel::default())?);
         Ok(Self {
             sid: sid.to_string(),
             msg_sender: Arc::new(Mutex::new(sandbox_args.sender)),
@@ -864,8 +823,7 @@ impl Persist for VirtSandbox {
             resource_manager,
             monitor: Arc::new(HealthCheck::new(true, keep_abnormal)),
             sandbox_config: None,
-            vagent: Arc::new(Mutex::new(vagent)),
-            vaccel_config: None,
+            vaccel_agent: vaccel_agent,
         })
     }
 }
