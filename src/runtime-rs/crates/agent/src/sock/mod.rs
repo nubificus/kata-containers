@@ -28,9 +28,9 @@ use tokio::{
 };
 use url::Url;
 
-const VSOCK_SCHEME: &str = "vsock";
-const HYBRID_VSOCK_SCHEME: &str = "hvsock";
-const REMOTE_SCHEME: &str = "remote";
+pub const VSOCK_SCHEME: &str = "vsock";
+pub const HYBRID_VSOCK_SCHEME: &str = "hvsock";
+pub const REMOTE_SCHEME: &str = "remote";
 
 /// Socket stream
 pub enum Stream {

@@ -297,9 +297,9 @@ experimental=@DEFAULTEXPFEATURES@
 # enable_pprof = true
 
 [vaccel]
-agent_path= "@AGENTPATH@"
-debug= "@AGENTDEBUG@"
-backends= @BACKENDS@
-backends_library= "@BACKENDSLIB@"
-endpoint_port= "@ENDPOINTPORT@"
-execution_type= @AGENTEXECTYPE@
+agent_path = "@VACCEL_AGENT_PATH@"
+agent_port = @VACCEL_AGENT_PORT@
+library_path = "@VACCEL_LIBRARY_PATH@"
+backends = "@VACCEL_BACKENDS@"
+log_level = @VACCEL_LOG_LEVEL@
+built_in = @VACCEL_BUILTIN@

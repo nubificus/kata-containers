@@ -37,8 +37,7 @@ runtime-spec = { path = "../../../../libs/runtime-spec" }
 oci-spec = { version = "0.6.8", features = ["runtime"] }
 persist = { path = "../../persist"}
 resource = { path = "../../resource" }
-
-vagent = { git = "https://github.com/nubificus/vaccel-rs-lib.git", branch = "feat_update_rust" }
+vaccel-agent = { path = "../../vaccel-agent" }
 
 [features]
 default = ["cloud-hypervisor"]
@@ -50,4 +49,4 @@ cloud-hypervisor = []
 dragonball = []
 
 # Enable the built-in vAccel RPC agent
-vaccel-rpc-agent = ["vagent/integrated"]
+vaccel-agent-builtin = ["vaccel-agent/builtin"]
