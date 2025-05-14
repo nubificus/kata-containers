@@ -49,7 +49,7 @@ impl VaccelAgent {
                 inner: Arc::new(Mutex::new(VaccelAgentBuiltinInner::new(config.clone()))),
             }),
             #[cfg(not(feature = "builtin"))]
-            true => return Err(anyhow!("Built-in vaccel agent not supported")),
+            true => Err(anyhow!("Built-in vaccel agent not supported")),
         }
     }
 

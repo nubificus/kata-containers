@@ -4,66 +4,72 @@
 //
 
 use crate::VaccelAgentInner;
-use anyhow::{anyhow, Result};
+use anyhow::{anyhow, Context, Result};
 use async_trait::async_trait;
-use kata_types::config::Vaccel as VaccelConfig;
-use std::ffi::CString;
-use ttrpc::sync::Server;
-use vaccel::ffi;
+use kata_types::config::Vaccel as VaccelKataConfig;
+use vaccel::Config as VaccelConfig;
+use vaccel_rpc_agent::Agent as RpcAgent;
 
 pub struct VaccelAgentBuiltinInner {
     address: String,
-    config: VaccelConfig,
-    server: Option<Server>,
+    config: VaccelKataConfig,
+    rpc_agent: Option<RpcAgent>,
 }
 
 impl VaccelAgentBuiltinInner {
-    pub fn new(config: VaccelConfig) -> Self {
+    pub fn new(config: VaccelKataConfig) -> Self {
         Self {
             address: "".to_string(),
             config,
-            server: None,
+            rpc_agent: None,
         }
+    }
+
+    async fn parse_vaccel_config(config: &VaccelKataConfig) -> Result<VaccelConfig> {
+        let mut plugins: Vec<String> = Vec::new();
+        for b in config.plugins.split(',') {
+            plugins.push(format!("{}/libvaccel-{}.so", config.library_path, b));
+        }
+        let plugins_string = plugins.join(":");
+
+        VaccelConfig::new(
+            Some(&plugins_string),
+            config.log_level,
+            config.log_file.as_deref(),
+            config.profiling_enabled,
+            config.version_ignore,
+        )
+        .context("parse vaccel config")
     }
 }
 
 #[async_trait]
 impl VaccelAgentInner for VaccelAgentBuiltinInner {
     async fn start(&mut self) -> Result<()> {
-        let mut server = vaccel_rpc_agent::server_init(&self.address)?;
+        let mut rpc_agent = RpcAgent::new(&self.address);
+        let vaccel_config = Self::parse_vaccel_config(&self.config).await?;
+        rpc_agent
+            .set_vaccel_config(vaccel_config)
+            .context("set vaccel config")?;
 
-        let mut backends: Vec<String> = Vec::new();
-        for b in self.config.backends.split(',') {
-            backends.push(format!("{}/libvaccel-{}.so", self.config.library_path, b));
-        }
-
-        let backends_string = backends.join(":");
-        let backends_cstring =
-            CString::new(backends_string.clone()).map_err(anyhow::Error::from)?;
-        match unsafe { ffi::vaccel_plugin_load(backends_cstring.as_c_str().as_ptr()) as u32 } {
-            ffi::VACCEL_OK => info!(sl!(), "Loaded new vaccel backends: {}", backends_string),
-            e => return Err(anyhow!("Could not load vaccel backends: Error {:?}", e)),
-        };
-
-        server.start().unwrap();
+        rpc_agent.start().context("start vaccel rpc agent")?;
         info!(sl!(), "Vaccel agent started");
 
-        self.server = Some(server);
+        self.rpc_agent = Some(rpc_agent);
 
         Ok(())
     }
 
     async fn stop(&mut self) -> Result<()> {
-        if let Some(server) = self.server.take() {
+        if let Some(mut rpc_agent) = self.rpc_agent.take() {
             info!(sl!(), "Stopping vaccel agent");
-            server.shutdown();
-            return Ok(());
+            return rpc_agent.shutdown().context("stop vaccel agent");
         }
 
-        Err(anyhow!("Tried to stop a not running vaccel agent"))
+        Err(anyhow!("Cannot stop uninitialized vaccel agent"))
     }
 
-    async fn config<'a>(&'a self) -> &'a VaccelConfig {
+    async fn config<'a>(&'a self) -> &'a VaccelKataConfig {
         &self.config
     }
 

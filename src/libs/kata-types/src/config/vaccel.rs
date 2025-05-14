@@ -11,28 +11,40 @@ use crate::config::{ConfigOps, TomlConfig};
 #[derive(Clone, Debug, Default, Deserialize, Serialize)]
 pub struct Vaccel {
     /// Path to the vaccel agent binary.
-    #[serde(default)]
+    #[serde(default = "default_agent_path")]
     pub agent_path: String,
 
     /// Agent server's port.
-    #[serde(default)]
+    #[serde(default = "default_agent_port")]
     pub agent_port: u16,
-
-    /// Library path for libvaccel/plugins.
-    #[serde(default)]
-    pub library_path: String,
-
-    /// Backend plugins  to load from agent's libvaccel.
-    #[serde(default)]
-    pub backends: String,
-
-    /// Log level for agent's libvaccel [1-4].
-    #[serde(default)]
-    pub log_level: u8,
 
     /// Use built-in agent.
     #[serde(default)]
     pub built_in: bool,
+
+    /// Library path for plugins.
+    #[serde(default)]
+    pub library_path: String,
+
+    /// Plugins to load from agent's libvaccel.
+    #[serde(default = "default_plugins")]
+    pub plugins: String,
+
+    /// Log level for agent's libvaccel [1-4].
+    #[serde(default = "default_log_level")]
+    pub log_level: u8,
+
+    /// Log file path for libvaccel/plugins.
+    #[serde(default)]
+    pub log_file: Option<String>,
+
+    /// Enable profiling.
+    #[serde(default)]
+    pub profiling_enabled: bool,
+
+    /// Ignore plugins' libvaccel version check.
+    #[serde(default)]
+    pub version_ignore: bool,
 }
 
 impl ConfigOps for Vaccel {
@@ -47,4 +59,20 @@ impl ConfigOps for Vaccel {
 
         Ok(())
     }
+}
+
+fn default_agent_path() -> String {
+    String::from("/usr/local/bin/vaccel-rpc-agent")
+}
+
+fn default_agent_port() -> u16 {
+    2048
+}
+
+fn default_plugins() -> String {
+    String::from("noop")
+}
+
+fn default_log_level() -> u8 {
+    1
 }

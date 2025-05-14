@@ -49,14 +49,23 @@ impl VaccelAgentInner for VaccelAgentExternalInner {
             .stderr(Stdio::piped());
 
         // Set vaccel environment variables
-        let mut backends: Vec<String> = Vec::new();
-        for b in self.config.backends.split(',') {
-            backends.push(format!("libvaccel-{}.so", b));
+        let mut plugins: Vec<String> = Vec::new();
+        for b in self.config.plugins.split(',') {
+            plugins.push(format!("libvaccel-{}.so", b));
         }
+
+        let profiling_enabled = self.config.profiling_enabled as u8;
+        let version_ignore = self.config.version_ignore as u8;
+
         cmd.env("LD_LIBRARY_PATH", &self.config.library_path)
-            .env("VACCEL_BACKENDS", backends.join(":"))
-            .env("VACCEL_DEBUG_LEVEL", self.config.log_level.to_string())
-            .env("VACCEL_LOG_FILE", "vaccel_log");
+            .env("VACCEL_PLUGINS", plugins.join(":"))
+            .env("VACCEL_PROFILING_ENABLED", profiling_enabled.to_string())
+            .env("VACCEL_VERSION_IGNORE", version_ignore.to_string())
+            .env("VACCEL_LOG_LEVEL", self.config.log_level.to_string());
+
+        if let Some(log_file) = self.config.log_file.as_ref() {
+            cmd.env("VACCEL_LOG_FILE", log_file);
+        }
 
         // Spawn process
         let mut child = cmd.spawn().context("spawn vaccel agent")?;

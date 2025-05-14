@@ -807,8 +807,13 @@ experimental=@DEFAULTEXPFEATURES@
 
 [vaccel]
 agent_path = "@VACCEL_AGENT_PATH@"
-agent_port = @VACCEL_AGENT_PORT@
+#agent_port = 2048
+#built_in = false
+
+# libvaccel options
 library_path = "@VACCEL_LIBRARY_PATH@"
-backends = "@VACCEL_BACKENDS@"
-log_level = @VACCEL_LOG_LEVEL@
-built_in = @VACCEL_BUILTIN@
+#plugins = "noop"
+#log_level = 1
+#log_file =
+#profiling_enabled = false
+#version_ignore = false

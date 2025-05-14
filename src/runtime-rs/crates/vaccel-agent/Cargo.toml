@@ -17,7 +17,6 @@ agent = { workspace = true }
 kata-types = { workspace = true }
 logging = { workspace = true }
 
-ttrpc = { git = "https://github.com/nubificus/ttrpc-rust.git", branch = "vaccel-dev", features = ["async"] }
 vaccel-rpc-agent = { git = "https://github.com/nubificus/vaccel-rust", branch="main", optional = true }
 vaccel = { git = "https://github.com/nubificus/vaccel-rust", branch = "main", optional = true }
 
